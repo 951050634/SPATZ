@@ -18,16 +18,15 @@ typedef struct
     _Float16 imag;
 } chalf;
 
-// 64-bit Complex Dot Product
 // sum += x[i] * y[i]
 cdouble cdotp_v64b(const cdouble *x, const cdouble *y, unsigned int avl)
 {
     unsigned int vl;
     double red_real, red_imag;
 
-    // INIT: LMUL=4
-    // v16-v19: Real Accumulator
-    // v20-v23: Imag Accumulator
+    // LMUL=4
+    // v16-v19: Real
+    // v20-v23: Imag
     asm volatile("vsetvli %0, %1, e64, m4, ta, ma" : "=r"(vl) : "r"(avl));
     asm volatile("vmv.v.i v16, 0"); // Acc_Real = 0
     asm volatile("vmv.v.i v20, 0"); // Acc_Imag = 0
@@ -36,17 +35,14 @@ cdouble cdotp_v64b(const cdouble *x, const cdouble *y, unsigned int avl)
     {
         asm volatile("vsetvli %0, %1, e64, m4, ta, ma" : "=r"(vl) : "r"(avl));
 
-        // Load X: v0=Xr, v4=Xi
+        // v0=Xr, v4=Xi
         asm volatile("vlseg2e64.v v0, (%0)" ::"r"(x));
 
-        // Load Y: v8=Yr, v12=Yi
+        // v8=Yr, v12=Yi
         asm volatile("vlseg2e64.v v8, (%0)" ::"r"(y));
 
-        // (Xr + iXi) * (Yr + iYi) = (XrYr - XiYi) + i(XrYi + XiYr)
-        // Real Part: Acc_r += Xr*Yr - Xi*Yi
         asm volatile("vfmacc.vv v16, v0, v8");   // v16 += Xr * Yr
         asm volatile("vfnmsac.vv v16, v4, v12"); // v16 -= Xi * Yi
-        // Imag Part: Acc_i += Xr*Yi + Xi*Yr
         asm volatile("vfmacc.vv v20, v0, v12"); // v20 += Xr * Yi
         asm volatile("vfmacc.vv v20, v4, v8");  // v20 += Xi * Yr
 
