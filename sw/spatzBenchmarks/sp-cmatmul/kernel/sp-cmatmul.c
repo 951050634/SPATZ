@@ -1,15 +1,15 @@
-#include "dp-cmatmul.h"
+#include "sp-cmatmul.h"
 #include <stddef.h>
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 typedef struct
 {
-    double real;
-    double imag;
-} cdouble;
+    float real;
+    float imag;
+} cfloat;
 
-void matmul(cdouble *c, const cdouble *a, const cdouble *b, const unsigned int M,
+void matmul(cfloat *c, const cfloat *a, const cfloat *b, const unsigned int M,
             const unsigned int N, const unsigned int P)
 {
     if (M <= 4)
@@ -22,45 +22,42 @@ void matmul(cdouble *c, const cdouble *a, const cdouble *b, const unsigned int M
     }
 }
 
-/*
-考虑到以下问题：
-1、覆盖写 or 累加写:
-    我们需要确保最终结果是 C = C + AB，而不是仅仅 C = AB（这是为了对应上大矩阵的分块计算操作）
-    因此，在写回结果时，我们需要先加载旧的 C 值，加上累加器的值，再存回去。
-2、寄存器分配:
-    采用循环后累加的操作，把计算增量AB和累加C+=AB两步分开处理
-*/
-void cmatmul_2xVL(cdouble *c, const cdouble *a, const cdouble *b,
-                  const unsigned int m_start, const unsigned int m_end,
-                  const unsigned int N, const unsigned int P,
-                  const unsigned int p_start, const unsigned int p_end)
+// ---------------
+// 2xVL (Single Precision Complex)
+// LMUL=4, SEW=32
+// ---------------
+void matmul_2xVL(cfloat *c, const cfloat *a, const cfloat *b,
+                 const unsigned int m_start, const unsigned int m_end,
+                 const unsigned int N, const unsigned int P,
+                 const unsigned int p_start, const unsigned int p_end)
 {
     unsigned int p = p_start;
     while (p < p_end)
     {
         size_t gvl;
-        asm volatile("vsetvli %[gvl], %[vl], e64, m4, ta, ma"
+        // e32, m4
+        asm volatile("vsetvli %[gvl], %[vl], e32, m4, ta, ma"
                      : [gvl] "=r"(gvl)
                      : [vl] "r"(p_end - p));
 
-        const cdouble *b_ = b + p;
-        cdouble *c_ = c + p;
+        const cfloat *b_ = b + p;
+        cfloat *c_ = c + p;
 
         for (unsigned int m = m_start; m < m_end; m += 2)
         {
-            const cdouble *a_ = a + m * N;
-            const cdouble *a__ = a_;
+            const cfloat *a_ = a + m * N;
+            const cfloat *a__ = a_;
 
             asm volatile("vmv.v.i v0, 0");
             asm volatile("vmv.v.i v4, 0");
             asm volatile("vmv.v.i v8, 0");
             asm volatile("vmv.v.i v12, 0");
 
-            const cdouble *b__ = b_;
-            asm volatile("vlseg2e64.v v16, (%0);" ::"r"(b__));
+            const cfloat *b__ = b_;
+            asm volatile("vlseg2e32.v v16, (%0);" ::"r"(b__));
             b__ += P;
 
-            double ar0, ai0, ar1, ai1;
+            float ar0, ai0, ar1, ai1;
             ar0 = a__[0].real;
             ai0 = a__[0].imag;
             ar1 = a__[N].real;
@@ -68,19 +65,21 @@ void cmatmul_2xVL(cdouble *c, const cdouble *a, const cdouble *b,
             a__++;
 
             unsigned int n = 0;
-            while (n < N) // 此处循环计算的过程中无法加载C，因为寄存器完全被占用
+            while (n < N)
             {
                 if (n + 1 < N)
                 {
-                    asm volatile("vlseg2e64.v v24, (%0);" ::"r"(b__));
+                    asm volatile("vlseg2e32.v v24, (%0);" ::"r"(b__));
                     b__ += P;
                 }
 
+                // Row 0
                 asm volatile("vfmacc.vf v0, %0, v16" ::"f"(ar0));
                 asm volatile("vfnmsac.vf v0, %0, v20" ::"f"(ai0));
                 asm volatile("vfmacc.vf v4, %0, v20" ::"f"(ar0));
                 asm volatile("vfmacc.vf v4, %0, v16" ::"f"(ai0));
 
+                // Row 1
                 asm volatile("vfmacc.vf v8, %0, v16" ::"f"(ar1));
                 asm volatile("vfnmsac.vf v8, %0, v20" ::"f"(ai1));
                 asm volatile("vfmacc.vf v12, %0, v20" ::"f"(ar1));
@@ -98,15 +97,17 @@ void cmatmul_2xVL(cdouble *c, const cdouble *a, const cdouble *b,
 
                 if (n + 1 < N)
                 {
-                    asm volatile("vlseg2e64.v v16, (%0);" ::"r"(b__));
+                    asm volatile("vlseg2e32.v v16, (%0);" ::"r"(b__));
                     b__ += P;
                 }
 
+                // Row 0 (Pipeline)
                 asm volatile("vfmacc.vf v0, %0, v24" ::"f"(ar0));
                 asm volatile("vfnmsac.vf v0, %0, v28" ::"f"(ai0));
                 asm volatile("vfmacc.vf v4, %0, v28" ::"f"(ar0));
                 asm volatile("vfmacc.vf v4, %0, v24" ::"f"(ai0));
 
+                // Row 1 (Pipeline)
                 asm volatile("vfmacc.vf v8, %0, v24" ::"f"(ar1));
                 asm volatile("vfnmsac.vf v8, %0, v28" ::"f"(ai1));
                 asm volatile("vfmacc.vf v12, %0, v28" ::"f"(ar1));
@@ -115,96 +116,84 @@ void cmatmul_2xVL(cdouble *c, const cdouble *a, const cdouble *b,
                 n++;
             }
 
-            cdouble *c_ptr_row0 = c_ + m * P;
-            cdouble *c_ptr_row1 = c_ + (m + 1) * P;
+            // Post-Accumulation
+            cfloat *c_ptr_row0 = c_ + m * P;
+            cfloat *c_ptr_row1 = c_ + (m + 1) * P;
 
-            // 复用 v16, v20 作为临时寄存器
-            asm volatile("vlseg2e64.v v16, (%0);" ::"r"(c_ptr_row0));
+            // Row 0
+            asm volatile("vlseg2e32.v v16, (%0);" ::"r"(c_ptr_row0));
             asm volatile("vfadd.vv v0, v0, v16");
             asm volatile("vfadd.vv v4, v4, v20");
-            asm volatile("vsseg2e64.v v0, (%0);" ::"r"(c_ptr_row0));
+            asm volatile("vsseg2e32.v v0, (%0);" ::"r"(c_ptr_row0));
 
-            asm volatile("vlseg2e64.v v16, (%0);" ::"r"(c_ptr_row1));
+            // Row 1
+            asm volatile("vlseg2e32.v v16, (%0);" ::"r"(c_ptr_row1));
             asm volatile("vfadd.vv v8, v8, v16");
             asm volatile("vfadd.vv v12, v12, v20");
-            asm volatile("vsseg2e64.v v8, (%0);" ::"r"(c_ptr_row1));
+            asm volatile("vsseg2e32.v v8, (%0);" ::"r"(c_ptr_row1));
         }
 
         p += gvl;
     }
 }
 
-void cmatmul_4xVL(cdouble *c, const cdouble *a, const cdouble *b,
-                  const unsigned int m_start, const unsigned int m_end,
-                  const unsigned int N, const unsigned int P,
-                  const unsigned int p_start, const unsigned int p_end)
+// ---------------
+// 4xVL (Single Precision Complex)
+// LMUL=2, SEW=32
+// ---------------
+void matmul_4xVL(cfloat *c, const cfloat *a, const cfloat *b,
+                 const unsigned int m_start, const unsigned int m_end,
+                 const unsigned int N, const unsigned int P,
+                 const unsigned int p_start, const unsigned int p_end)
 {
-
     unsigned int p = p_start;
     while (p < p_end)
     {
-        // 1. 设置向量长度 (LMUL=2)
         size_t gvl;
-        asm volatile("vsetvli %[gvl], %[vl], e64, m2, ta, ma"
+        // e32, m2
+        asm volatile("vsetvli %[gvl], %[vl], e32, m2, ta, ma"
                      : [gvl] "=r"(gvl)
                      : [vl] "r"(p_end - p));
 
-        const cdouble *b_ = b + p;
-        cdouble *c_ = c + p;
+        const cfloat *b_ = b + p;
+        cfloat *c_ = c + p;
 
         for (unsigned int m = m_start; m < m_end; m += 4)
         {
-            // 2. 初始化 4 行的累加器为 0
-            // 虽然我们要计算 C += AB，但为了寄存器分配方便，
-            // 我们先计算 Delta = AB (从0开始累加)，最后再加回 C。
-
-            // Row 0
+            // Init Acc
             asm volatile("vmv.v.i v0, 0");
             asm volatile("vmv.v.i v2, 0");
-            // Row 1
             asm volatile("vmv.v.i v4, 0");
             asm volatile("vmv.v.i v6, 0");
-            // Row 2
             asm volatile("vmv.v.i v8, 0");
             asm volatile("vmv.v.i v10, 0");
-            // Row 3
             asm volatile("vmv.v.i v12, 0");
             asm volatile("vmv.v.i v14, 0");
 
-            // 3. 流水线准备 (Pipeline Prologue)
-            const cdouble *b__ = b_;
-            // Load first B chunk into v16(Re), v18(Im)
-            asm volatile("vlseg2e64.v v16, (%0);" ::"r"(b__));
+            const cfloat *b__ = b_;
+            asm volatile("vlseg2e32.v v16, (%0);" ::"r"(b__));
             b__ += P;
 
             unsigned int n = 0;
             while (n < N)
             {
-                // Load Scalars for 4 rows
-                // 实际高性能代码可能需要手动展开这个循环以减少标量负载开销
-                double ar[4], ai[4];
-                // Row m
+                float ar[4], ai[4];
                 ar[0] = a[(m + 0) * N + n].real;
                 ai[0] = a[(m + 0) * N + n].imag;
-                // Row m+1
                 ar[1] = a[(m + 1) * N + n].real;
                 ai[1] = a[(m + 1) * N + n].imag;
-                // Row m+2
                 ar[2] = a[(m + 2) * N + n].real;
                 ai[2] = a[(m + 2) * N + n].imag;
-                // Row m+3
                 ar[3] = a[(m + 3) * N + n].real;
                 ai[3] = a[(m + 3) * N + n].imag;
 
-                // Pipeline Prefetch: Load Next B into v20/v22
                 if (n + 1 < N)
                 {
-                    asm volatile("vlseg2e64.v v20, (%0);" ::"r"(b__));
+                    asm volatile("vlseg2e32.v v20, (%0);" ::"r"(b__));
                     b__ += P;
                 }
 
-                // --- Compute Block 1 (Using v16/v18) ---
-
+                // Block 1 (v16/v18)
                 // Row 0
                 asm volatile("vfmacc.vf v0, %0, v16" ::"f"(ar[0]));
                 asm volatile("vfnmsac.vf v0, %0, v18" ::"f"(ai[0]));
@@ -230,7 +219,6 @@ void cmatmul_4xVL(cdouble *c, const cdouble *a, const cdouble *b,
                 if (n == N)
                     break;
 
-                // --- Pipeline Block 2 (Using v20/v22) ---
                 // Load Next Scalars
                 ar[0] = a[(m + 0) * N + n].real;
                 ai[0] = a[(m + 0) * N + n].imag;
@@ -241,29 +229,29 @@ void cmatmul_4xVL(cdouble *c, const cdouble *a, const cdouble *b,
                 ar[3] = a[(m + 3) * N + n].real;
                 ai[3] = a[(m + 3) * N + n].imag;
 
-                // Pipeline Back-load: Next-Next B into v16/v18
                 if (n + 1 < N)
                 {
-                    asm volatile("vlseg2e64.v v16, (%0);" ::"r"(b__));
+                    asm volatile("vlseg2e32.v v16, (%0);" ::"r"(b__));
                     b__ += P;
                 }
 
-                // Compute Row 0
+                // Block 2 (v20/v22)
+                // Row 0
                 asm volatile("vfmacc.vf v0, %0, v20" ::"f"(ar[0]));
                 asm volatile("vfnmsac.vf v0, %0, v22" ::"f"(ai[0]));
                 asm volatile("vfmacc.vf v2, %0, v22" ::"f"(ar[0]));
                 asm volatile("vfmacc.vf v2, %0, v20" ::"f"(ai[0]));
-                // Compute Row 1
+                // Row 1
                 asm volatile("vfmacc.vf v4, %0, v20" ::"f"(ar[1]));
                 asm volatile("vfnmsac.vf v4, %0, v22" ::"f"(ai[1]));
                 asm volatile("vfmacc.vf v6, %0, v22" ::"f"(ar[1]));
                 asm volatile("vfmacc.vf v6, %0, v20" ::"f"(ai[1]));
-                // Compute Row 2
+                // Row 2
                 asm volatile("vfmacc.vf v8, %0, v20" ::"f"(ar[2]));
                 asm volatile("vfnmsac.vf v8, %0, v22" ::"f"(ai[2]));
                 asm volatile("vfmacc.vf v10, %0, v22" ::"f"(ar[2]));
                 asm volatile("vfmacc.vf v10, %0, v20" ::"f"(ai[2]));
-                // Compute Row 3
+                // Row 3
                 asm volatile("vfmacc.vf v12, %0, v20" ::"f"(ar[3]));
                 asm volatile("vfnmsac.vf v12, %0, v22" ::"f"(ai[3]));
                 asm volatile("vfmacc.vf v14, %0, v22" ::"f"(ar[3]));
@@ -272,38 +260,35 @@ void cmatmul_4xVL(cdouble *c, const cdouble *a, const cdouble *b,
                 n++;
             }
 
-            // 4. Write-Back Consistency Phase (Post-Accumulation)
-            // Loop is done. v16-v23 are now free (garbage data).
-            // We reuse v16, v18 as temporary storage for Old C.
+            // Post-Accumulation
+            cfloat *c__ = c_ + m * P;
 
-            cdouble *c__ = c_ + m * P;
-
-            // --- Row 0 ---
-            asm volatile("vlseg2e64.v v16, (%0);" ::"r"(c__)); // Load Old C -> v16, v18
-            asm volatile("vfadd.vv v0, v0, v16");              // Acc_Re += Old_Re
-            asm volatile("vfadd.vv v2, v2, v18");              // Acc_Im += Old_Im
-            asm volatile("vsseg2e64.v v0, (%0);" ::"r"(c__));  // Store Back
+            // Row 0
+            asm volatile("vlseg2e32.v v16, (%0);" ::"r"(c__));
+            asm volatile("vfadd.vv v0, v0, v16");
+            asm volatile("vfadd.vv v2, v2, v18");
+            asm volatile("vsseg2e32.v v0, (%0);" ::"r"(c__));
             c__ += P;
 
-            // --- Row 1 ---
-            asm volatile("vlseg2e64.v v16, (%0);" ::"r"(c__));
+            // Row 1
+            asm volatile("vlseg2e32.v v16, (%0);" ::"r"(c__));
             asm volatile("vfadd.vv v4, v4, v16");
             asm volatile("vfadd.vv v6, v6, v18");
-            asm volatile("vsseg2e64.v v4, (%0);" ::"r"(c__));
+            asm volatile("vsseg2e32.v v4, (%0);" ::"r"(c__));
             c__ += P;
 
-            // --- Row 2 ---
-            asm volatile("vlseg2e64.v v16, (%0);" ::"r"(c__));
+            // Row 2
+            asm volatile("vlseg2e32.v v16, (%0);" ::"r"(c__));
             asm volatile("vfadd.vv v8, v8, v16");
             asm volatile("vfadd.vv v10, v10, v18");
-            asm volatile("vsseg2e64.v v8, (%0);" ::"r"(c__));
+            asm volatile("vsseg2e32.v v8, (%0);" ::"r"(c__));
             c__ += P;
 
-            // --- Row 3 ---
-            asm volatile("vlseg2e64.v v16, (%0);" ::"r"(c__));
+            // Row 3
+            asm volatile("vlseg2e32.v v16, (%0);" ::"r"(c__));
             asm volatile("vfadd.vv v12, v12, v16");
             asm volatile("vfadd.vv v14, v14, v18");
-            asm volatile("vsseg2e64.v v12, (%0);" ::"r"(c__));
+            asm volatile("vsseg2e32.v v12, (%0);" ::"r"(c__));
         }
 
         p += gvl;
