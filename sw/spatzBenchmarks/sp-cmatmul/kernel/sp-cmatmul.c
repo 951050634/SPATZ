@@ -25,6 +25,7 @@ void matmul(cfloat *c, const cfloat *a, const cfloat *b, const unsigned int M,
 // ---------------
 // 2xVL (Single Precision Complex)
 // LMUL=4, SEW=32
+// Optimization: Dual Pointers for A
 // ---------------
 void matmul_2xVL(cfloat *c, const cfloat *a, const cfloat *b,
                  const unsigned int m_start, const unsigned int m_end,
@@ -35,7 +36,6 @@ void matmul_2xVL(cfloat *c, const cfloat *a, const cfloat *b,
     while (p < p_end)
     {
         size_t gvl;
-        // e32, m4
         asm volatile("vsetvli %[gvl], %[vl], e32, m4, ta, ma"
                      : [gvl] "=r"(gvl)
                      : [vl] "r"(p_end - p));
@@ -45,8 +45,10 @@ void matmul_2xVL(cfloat *c, const cfloat *a, const cfloat *b,
 
         for (unsigned int m = m_start; m < m_end; m += 2)
         {
-            const cfloat *a_ = a + m * N;
-            const cfloat *a__ = a_;
+            // --- Pointer Optimization ---
+            // 建立两个独立的指针，分别指向第 m 行和第 m+1 行
+            const cfloat *p_a0 = a + m * N;
+            const cfloat *p_a1 = p_a0 + N;
 
             asm volatile("vmv.v.i v0, 0");
             asm volatile("vmv.v.i v4, 0");
@@ -58,11 +60,14 @@ void matmul_2xVL(cfloat *c, const cfloat *a, const cfloat *b,
             b__ += P;
 
             float ar0, ai0, ar1, ai1;
-            ar0 = a__[0].real;
-            ai0 = a__[0].imag;
-            ar1 = a__[N].real;
-            ai1 = a__[N].imag;
-            a__++;
+
+            // Prefetch Scalars (Direct dereference)
+            ar0 = p_a0->real;
+            ai0 = p_a0->imag;
+            p_a0++;
+            ar1 = p_a1->real;
+            ai1 = p_a1->imag;
+            p_a1++;
 
             unsigned int n = 0;
             while (n < N)
@@ -89,11 +94,13 @@ void matmul_2xVL(cfloat *c, const cfloat *a, const cfloat *b,
                 if (n == N)
                     break;
 
-                ar0 = a__[0].real;
-                ai0 = a__[0].imag;
-                ar1 = a__[N].real;
-                ai1 = a__[N].imag;
-                a__++;
+                // Load Next Scalars (No complex offset calculation)
+                ar0 = p_a0->real;
+                ai0 = p_a0->imag;
+                p_a0++;
+                ar1 = p_a1->real;
+                ai1 = p_a1->imag;
+                p_a1++;
 
                 if (n + 1 < N)
                 {
@@ -101,13 +108,13 @@ void matmul_2xVL(cfloat *c, const cfloat *a, const cfloat *b,
                     b__ += P;
                 }
 
-                // Row 0 (Pipeline)
+                // Pipeline Row 0
                 asm volatile("vfmacc.vf v0, %0, v24" ::"f"(ar0));
                 asm volatile("vfnmsac.vf v0, %0, v28" ::"f"(ai0));
                 asm volatile("vfmacc.vf v4, %0, v28" ::"f"(ar0));
                 asm volatile("vfmacc.vf v4, %0, v24" ::"f"(ai0));
 
-                // Row 1 (Pipeline)
+                // Pipeline Row 1
                 asm volatile("vfmacc.vf v8, %0, v24" ::"f"(ar1));
                 asm volatile("vfnmsac.vf v8, %0, v28" ::"f"(ai1));
                 asm volatile("vfmacc.vf v12, %0, v28" ::"f"(ar1));
@@ -116,17 +123,15 @@ void matmul_2xVL(cfloat *c, const cfloat *a, const cfloat *b,
                 n++;
             }
 
-            // Post-Accumulation
+            // Write-Back
             cfloat *c_ptr_row0 = c_ + m * P;
             cfloat *c_ptr_row1 = c_ + (m + 1) * P;
 
-            // Row 0
             asm volatile("vlseg2e32.v v16, (%0);" ::"r"(c_ptr_row0));
             asm volatile("vfadd.vv v0, v0, v16");
             asm volatile("vfadd.vv v4, v4, v20");
             asm volatile("vsseg2e32.v v0, (%0);" ::"r"(c_ptr_row0));
 
-            // Row 1
             asm volatile("vlseg2e32.v v16, (%0);" ::"r"(c_ptr_row1));
             asm volatile("vfadd.vv v8, v8, v16");
             asm volatile("vfadd.vv v12, v12, v20");
@@ -140,6 +145,7 @@ void matmul_2xVL(cfloat *c, const cfloat *a, const cfloat *b,
 // ---------------
 // 4xVL (Single Precision Complex)
 // LMUL=2, SEW=32
+// Optimization: Quad Pointers for A
 // ---------------
 void matmul_4xVL(cfloat *c, const cfloat *a, const cfloat *b,
                  const unsigned int m_start, const unsigned int m_end,
@@ -150,7 +156,6 @@ void matmul_4xVL(cfloat *c, const cfloat *a, const cfloat *b,
     while (p < p_end)
     {
         size_t gvl;
-        // e32, m2
         asm volatile("vsetvli %[gvl], %[vl], e32, m2, ta, ma"
                      : [gvl] "=r"(gvl)
                      : [vl] "r"(p_end - p));
@@ -160,7 +165,6 @@ void matmul_4xVL(cfloat *c, const cfloat *a, const cfloat *b,
 
         for (unsigned int m = m_start; m < m_end; m += 4)
         {
-            // Init Acc
             asm volatile("vmv.v.i v0, 0");
             asm volatile("vmv.v.i v2, 0");
             asm volatile("vmv.v.i v4, 0");
@@ -170,6 +174,12 @@ void matmul_4xVL(cfloat *c, const cfloat *a, const cfloat *b,
             asm volatile("vmv.v.i v12, 0");
             asm volatile("vmv.v.i v14, 0");
 
+            // --- Pointer Optimization ---
+            const cfloat *p_a0 = a + m * N;
+            const cfloat *p_a1 = p_a0 + N;
+            const cfloat *p_a2 = p_a1 + N;
+            const cfloat *p_a3 = p_a2 + N;
+
             const cfloat *b__ = b_;
             asm volatile("vlseg2e32.v v16, (%0);" ::"r"(b__));
             b__ += P;
@@ -178,14 +188,20 @@ void matmul_4xVL(cfloat *c, const cfloat *a, const cfloat *b,
             while (n < N)
             {
                 float ar[4], ai[4];
-                ar[0] = a[(m + 0) * N + n].real;
-                ai[0] = a[(m + 0) * N + n].imag;
-                ar[1] = a[(m + 1) * N + n].real;
-                ai[1] = a[(m + 1) * N + n].imag;
-                ar[2] = a[(m + 2) * N + n].real;
-                ai[2] = a[(m + 2) * N + n].imag;
-                ar[3] = a[(m + 3) * N + n].real;
-                ai[3] = a[(m + 3) * N + n].imag;
+
+                // Scalar Load (Quad Pointer)
+                ar[0] = p_a0->real;
+                ai[0] = p_a0->imag;
+                p_a0++;
+                ar[1] = p_a1->real;
+                ai[1] = p_a1->imag;
+                p_a1++;
+                ar[2] = p_a2->real;
+                ai[2] = p_a2->imag;
+                p_a2++;
+                ar[3] = p_a3->real;
+                ai[3] = p_a3->imag;
+                p_a3++;
 
                 if (n + 1 < N)
                 {
@@ -220,14 +236,18 @@ void matmul_4xVL(cfloat *c, const cfloat *a, const cfloat *b,
                     break;
 
                 // Load Next Scalars
-                ar[0] = a[(m + 0) * N + n].real;
-                ai[0] = a[(m + 0) * N + n].imag;
-                ar[1] = a[(m + 1) * N + n].real;
-                ai[1] = a[(m + 1) * N + n].imag;
-                ar[2] = a[(m + 2) * N + n].real;
-                ai[2] = a[(m + 2) * N + n].imag;
-                ar[3] = a[(m + 3) * N + n].real;
-                ai[3] = a[(m + 3) * N + n].imag;
+                ar[0] = p_a0->real;
+                ai[0] = p_a0->imag;
+                p_a0++;
+                ar[1] = p_a1->real;
+                ai[1] = p_a1->imag;
+                p_a1++;
+                ar[2] = p_a2->real;
+                ai[2] = p_a2->imag;
+                p_a2++;
+                ar[3] = p_a3->real;
+                ai[3] = p_a3->imag;
+                p_a3++;
 
                 if (n + 1 < N)
                 {
@@ -260,37 +280,31 @@ void matmul_4xVL(cfloat *c, const cfloat *a, const cfloat *b,
                 n++;
             }
 
-            // Post-Accumulation
+            // Write-Back
             cfloat *c__ = c_ + m * P;
-
-            // Row 0
             asm volatile("vlseg2e32.v v16, (%0);" ::"r"(c__));
             asm volatile("vfadd.vv v0, v0, v16");
             asm volatile("vfadd.vv v2, v2, v18");
             asm volatile("vsseg2e32.v v0, (%0);" ::"r"(c__));
             c__ += P;
 
-            // Row 1
             asm volatile("vlseg2e32.v v16, (%0);" ::"r"(c__));
             asm volatile("vfadd.vv v4, v4, v16");
             asm volatile("vfadd.vv v6, v6, v18");
             asm volatile("vsseg2e32.v v4, (%0);" ::"r"(c__));
             c__ += P;
 
-            // Row 2
             asm volatile("vlseg2e32.v v16, (%0);" ::"r"(c__));
             asm volatile("vfadd.vv v8, v8, v16");
             asm volatile("vfadd.vv v10, v10, v18");
             asm volatile("vsseg2e32.v v8, (%0);" ::"r"(c__));
             c__ += P;
 
-            // Row 3
             asm volatile("vlseg2e32.v v16, (%0);" ::"r"(c__));
             asm volatile("vfadd.vv v12, v12, v16");
             asm volatile("vfadd.vv v14, v14, v18");
             asm volatile("vsseg2e32.v v12, (%0);" ::"r"(c__));
         }
-
         p += gvl;
     }
 }

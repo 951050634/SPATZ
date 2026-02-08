@@ -56,7 +56,7 @@ void matmul_2xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
       const __fp16 *a_ = a + m * N;
       const __fp16 *a__ = a_;
 
-      asm volatile("vle32.v v16, (%0);" ::"r"(b_));
+      asm volatile("vle32.v v16, (%0);" ::"r"(b_)); // ？？？
       const __fp16 *b__ = b_ + P;
 
       __fp16 *c__ = c_ + m * P;

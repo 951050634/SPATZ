@@ -3,12 +3,6 @@
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
-typedef struct
-{
-    double real;
-    double imag;
-} cdouble;
-
 void matmul(cdouble *c, const cdouble *a, const cdouble *b, const unsigned int M,
             const unsigned int N, const unsigned int P)
 {

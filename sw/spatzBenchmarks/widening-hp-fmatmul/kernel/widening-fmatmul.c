@@ -22,12 +22,18 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 void matmul(__fp16 *c, const __fp16 *a, const __fp16 *b, const unsigned int M,
-            const unsigned int N, const unsigned int P) {
-  if (M <= 4) {
+            const unsigned int N, const unsigned int P)
+{
+  if (M <= 4)
+  {
     matmul_2xVL(c, a, b, 0, M, N, P, 0, P);
-  } else if (M <= 8) {
+  }
+  else if (M <= 8)
+  {
     matmul_4xVL(c, a, b, 0, M, N, P, 0, P);
-  } else {
+  }
+  else
+  {
     matmul_8xVL(c, a, b, 0, M, N, P, 0, P);
   }
 }
@@ -36,15 +42,19 @@ void matmul(__fp16 *c, const __fp16 *a, const __fp16 *b, const unsigned int M,
 // 2xVL
 // ---------------
 
+// 基本逻辑与hp-cmatmul类似
+// widening技术：输入16bit，中间计算过程使用32bit以保证精度，最后输出为16bit
 void matmul_2xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
                  const unsigned int m_start, const unsigned int m_end,
                  const unsigned int N, const unsigned int P,
-                 const unsigned int p_start, const unsigned int p_end) {
-
+                 const unsigned int p_start, const unsigned int p_end)
+{
   unsigned int p = p_start;
-  while (p < p_end) {
+  while (p < p_end)
+  {
     // Calculate the vl
     size_t gvl;
+    // 为了后面使用 widening 指令，此处设置为m4，后续展开至m8
     asm volatile("vsetvli %[gvl], %[vl], e16, m4, ta, ma"
                  : [gvl] "=r"(gvl)
                  : [vl] "r"(p_end - p));
@@ -52,7 +62,8 @@ void matmul_2xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
     const __fp16 *b_ = b + p;
     __fp16 *c_ = c + p;
 
-    for (unsigned int m = m_start; m < m_end; m += 2) {
+    for (unsigned int m = m_start; m < m_end; m += 2)
+    {
       const __fp16 *a_ = a + m * N;
       const __fp16 *a__ = a_;
 
@@ -63,24 +74,29 @@ void matmul_2xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
 
       double t0, t1;
 
-      asm volatile("vsetvli zero, %0, e32, m4, ta, ma" ::"r"(gvl));
+      asm volatile("vsetvli zero, %0, e32, m4, ta, ma" ::"r"(gvl)); // 切换至32bit模式，清零累加器部分
 
+      // vmv.v.i vd, imm # vd[i] = imm
       asm volatile("vmv.v.x v0, zero");
       asm volatile("flh %[t], 0(%[a])" : [t] "=f"(t0) : [a] "r"(a__));
       a__ += N;
       asm volatile("vmv.v.x v8, zero");
       asm volatile("flh %[t], 0(%[a])" : [t] "=f"(t1) : [a] "r"(a__));
 
-      asm volatile("vsetvli zero, %0, e16, m4, ta, ma" ::"r"(gvl));
+      asm volatile("vsetvli zero, %0, e16, m4, ta, ma" ::"r"(gvl)); // 切换回16bit模式，准备读取数据
 
       unsigned int n = 0;
 
-      while (n < N) {
+      while (n < N)
+      {
         a__ = a_ + ++n;
 
         asm volatile("vle16.v v24, (%0);" ::"r"(b__));
         b__ += P;
 
+        // The multiplier inputs are all SEW wide, while the addend and destination is 2*SEW bits wide.
+        // vfwmacc.vf vd, rs1, vs2, vm # vd[i] = +(f[rs1] * vs2[i]) + vd[i]
+        // function：v0(32bit) += t0(16bit) * v16(16bit)
         asm volatile("vfwmacc.vf v0, %0, v16" ::"f"(t0));
         asm volatile("flh %[t], 0(%[a])" : [t] "=f"(t0) : [a] "r"(a__));
         a__ += N;
@@ -102,7 +118,11 @@ void matmul_2xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
         asm volatile("flh %[t], 0(%[a])" : [t] "=f"(t1) : [a] "r"(a__));
       }
 
+      // 处理最后一组数据
       asm volatile("vfwmacc.vf v0, %0, v24" ::"f"(t0));
+      // A set of conversion instructions is provided to convert wider integer and
+      // floating-point datatypes to a type of half the width.
+      // vfncvt.f.f.w vd, vs2, vm # Convert double-width float to single-width float.
       asm volatile("vfncvt.f.f.w v0, v0");
       asm volatile("vse16.v v0, (%0);" ::"r"(c__));
       c__ += P;
@@ -122,10 +142,12 @@ void matmul_2xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
 void matmul_4xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
                  const unsigned int m_start, const unsigned int m_end,
                  const unsigned int N, const unsigned int P,
-                 const unsigned int p_start, const unsigned int p_end) {
+                 const unsigned int p_start, const unsigned int p_end)
+{
 
   unsigned int p = p_start;
-  while (p < p_end) {
+  while (p < p_end)
+  {
     // Calculate the vl
     size_t gvl;
     asm volatile("vsetvli %[gvl], %[vl], e16, m2, ta, ma"
@@ -135,7 +157,8 @@ void matmul_4xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
     const __fp16 *b_ = b + p;
     __fp16 *c_ = c + p;
 
-    for (unsigned int m = m_start; m < m_end; m += 4) {
+    for (unsigned int m = m_start; m < m_end; m += 4)
+    {
       const __fp16 *a_ = a + m * N;
       const __fp16 *a__ = a_;
 
@@ -164,7 +187,8 @@ void matmul_4xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
 
       unsigned int n = 0;
 
-      while (n < N) {
+      while (n < N)
+      {
         a__ = a_ + ++n;
 
         asm volatile("vle16.v v20, (%0);" ::"r"(b__));
@@ -231,10 +255,12 @@ void matmul_4xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
 void matmul_8xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
                  const unsigned int m_start, const unsigned int m_end,
                  const unsigned int N, const unsigned int P,
-                 const unsigned int p_start, const unsigned int p_end) {
+                 const unsigned int p_start, const unsigned int p_end)
+{
 
   unsigned int p = p_start;
-  while (p < p_end) {
+  while (p < p_end)
+  {
     // Calculate the vl
     size_t gvl;
     asm volatile("vsetvli %[gvl], %[vl], e16, m1, ta, ma"
@@ -244,7 +270,8 @@ void matmul_8xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
     const __fp16 *b_ = b + p;
     __fp16 *c_ = c + p;
 
-    for (unsigned int m = m_start; m < m_end; m += 8) {
+    for (unsigned int m = m_start; m < m_end; m += 8)
+    {
       const __fp16 *a_ = a + m * N;
       const __fp16 *a__ = a_;
 
@@ -285,7 +312,8 @@ void matmul_8xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
 
       unsigned int n = 0;
 
-      while (n < N) {
+      while (n < N)
+      {
         a__ = a_ + ++n;
 
         asm volatile("vle16.v v20, (%0);" ::"r"(b__));
