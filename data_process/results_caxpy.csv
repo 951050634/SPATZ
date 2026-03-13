@@ -1,0 +1,3 @@
+test_name,M,test_time_sec,max_cycle_hart0,max_cycle_hart1,max_cycle
+spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-caxpy_M256,256,1.47,3684,3679,3684
+spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-caxpy_M1024,1024,1.83,4580,4575,4580

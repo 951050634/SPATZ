@@ -1,0 +1,5 @@
+type,test_name,M,status,test_time_sec,max_cycle_hart0,max_cycle_hart1,max_cycle
+non-complex,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-fdotp_M128,128,PASS,1.57,3697,3691,3697
+non-complex,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-fdotp_M4096,4096,PASS,2.75,5784,5778,5784
+complex,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-cdotp_ver2_M128,128,PASS,1.45,3404,3392,3404
+complex,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-cdotp_ver2_M4096,4096,PASS,2.41,5040,5070,5070
