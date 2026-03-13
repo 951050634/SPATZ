@@ -1,0 +1,3 @@
+type,test_name,M,N,K,status,test_time_sec,max_cycle_hart0,max_cycle_hart1,max_cycle
+non-complex,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-fmatmul_M64_N64_K64,64,64,64,PASS,34.12,70196,70190,70196
+complex,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-cmatmul_ver2_M64_N64_K64,64,64,64,PASS,45.34,93283,43552,93283

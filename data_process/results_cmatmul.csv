@@ -1,0 +1,3 @@
+test_name,M,N,K,status,test_time_sec,max_cycle_hart0,max_cycle_hart1,max_cycle
+spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-cmatmul_M64_N64_K64,64,64,64,FAIL,8.00,NA,NA,NA
+spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-cmatmul_ver2_M64_N64_K64,64,64,64,PASS,45.34,93283,43552,93283

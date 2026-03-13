@@ -33,6 +33,13 @@ macro(add_spatz_test_oneParam name file param1)
   target_compile_definitions(test-${SNITCH_TEST_PREFIX}${target_name} PUBLIC DATAHEADER="data/data_${param1}.h" SNRT_NFPU_PER_CORE=${SNRT_NFPU_PER_CORE})
 endmacro()
 
+macro(add_spatz_test_oneParam_with_data name file data_dir param1)
+  set(target_name ${name}_M${param1})
+  add_snitch_test(${target_name} ${file})
+  target_link_libraries(test-${SNITCH_TEST_PREFIX}${target_name} benchmark ${SNITCH_RUNTIME})
+  target_compile_definitions(test-${SNITCH_TEST_PREFIX}${target_name} PUBLIC DATAHEADER="${data_dir}/data_${param1}.h" SNRT_NFPU_PER_CORE=${SNRT_NFPU_PER_CORE})
+endmacro()
+
 macro(add_spatz_test_twoParam name file param1 param2)
   set(target_name ${name}_M${param1}_N${param2})
   add_snitch_test(${target_name} ${file})
@@ -45,6 +52,13 @@ macro(add_spatz_test_threeParam name file param1 param2 param3)
   add_snitch_test(${target_name} ${file})
   target_link_libraries(test-${SNITCH_TEST_PREFIX}${target_name} benchmark ${SNITCH_RUNTIME})
   target_compile_definitions(test-${SNITCH_TEST_PREFIX}${target_name} PUBLIC DATAHEADER="data/data_${param1}_${param2}_${param3}.h" SNRT_NFPU_PER_CORE=${SNRT_NFPU_PER_CORE})
+endmacro()
+
+macro(add_spatz_test_threeParam_with_data name file data_dir param1 param2 param3)
+  set(target_name ${name}_M${param1}_N${param2}_K${param3})
+  add_snitch_test(${target_name} ${file})
+  target_link_libraries(test-${SNITCH_TEST_PREFIX}${target_name} benchmark ${SNITCH_RUNTIME})
+  target_compile_definitions(test-${SNITCH_TEST_PREFIX}${target_name} PUBLIC DATAHEADER="${data_dir}/data_${param1}_${param2}_${param3}.h" SNRT_NFPU_PER_CORE=${SNRT_NFPU_PER_CORE})
 endmacro()
 
 # Benchmark library
@@ -123,21 +137,7 @@ add_spatz_test_oneParam(dp-caxpy dp-caxpy/main.c 1024)
 
 add_spatz_test_oneParam(dp-cdotp dp-cdotp/main.c 128)
 add_spatz_test_oneParam(dp-cdotp dp-cdotp/main.c 4096)
-
+add_spatz_test_oneParam_with_data(dp-cdotp_ver2 dp-cdotp_ver2/main.c ../dp-cdotp/data 128)
+add_spatz_test_oneParam_with_data(dp-cdotp_ver2 dp-cdotp_ver2/main.c ../dp-cdotp/data 4096)
 add_spatz_test_threeParam(dp-cmatmul dp-cmatmul/main.c 64 64 64)
-
-add_spatz_test_threeParam(sp-cmatmul sp-cmatmul/main.c 64 64 64)
-add_spatz_test_threeParam(sp-cmatmul sp-cmatmul/main.c 64 128 64)
-
-add_spatz_test_threeParam(hp-cmatmul hp-cmatmul/main.c 64 64 64)
-add_spatz_test_threeParam(hp-cmatmul hp-cmatmul/main.c 64 128 64)
-add_spatz_test_threeParam(hp-cmatmul hp-cmatmul/main.c 128 128 128)
-
-add_spatz_test_threeParam(widening-hp-cmatmul widening-hp-cmatmul/main.c 64 64 64)
-add_spatz_test_threeParam(widening-hp-cmatmul widening-hp-cmatmul/main.c 64 128 64)
-add_spatz_test_threeParam(widening-hp-cmatmul widening-hp-cmatmul/main.c 128 128 128)
-
-add_spatz_test_threeParam(widening-bp-cmatmul widening-bp-cmatmul/main.c 64 64 64)
-add_spatz_test_threeParam(widening-bp-cmatmul widening-bp-cmatmul/main.c 64 128 64)
-add_spatz_test_threeParam(widening-bp-cmatmul widening-bp-cmatmul/main.c 128 128 128)
-add_spatz_test_threeParam(widening-bp-cmatmul widening-bp-cmatmul/main.c 128 256 128)
+add_spatz_test_threeParam_with_data(dp-cmatmul_ver2 dp-cmatmul_ver2/main.c ../dp-cmatmul/data 64 64 64)

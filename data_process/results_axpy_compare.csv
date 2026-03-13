@@ -1,0 +1,5 @@
+type,test_name,M,test_time_sec,max_cycle_hart0,max_cycle_hart1,max_cycle
+non-complex,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-faxpy_M256,256,1.37,3452,3447,3452
+non-complex,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-faxpy_M1024,1024,1.58,3976,3970,3976
+complex,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-caxpy_M256,256,1.43,3684,3679,3684
+complex,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-caxpy_M1024,1024,2.33,4580,4575,4580
