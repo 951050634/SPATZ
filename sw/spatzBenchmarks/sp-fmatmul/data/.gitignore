@@ -1,1 +1,2 @@
-data_gemm.h
+# Keep generated headers trackable.
+!*.h
