@@ -27,6 +27,7 @@ double fdotp_v64b(const double *a, const double *b, unsigned int avl) {
 
   // Clean the accumulator
   asm volatile("vsetvli %0, %1, e64, m8, ta, ma" : "=r"(vl) : "r"(avl));
+  // vmv.s.x vd, rs1 # vd[0] = x[rs1] (vs2=0)
   asm volatile("vmv.s.x v0, zero");
 
   // Stripmine and accumulate a partial reduced vector
@@ -39,9 +40,13 @@ double fdotp_v64b(const double *a, const double *b, unsigned int avl) {
     asm volatile("vle64.v v16, (%0)" ::"r"(b));
 
     // Multiply and accumulate
+    // 8~15 * 16~23 -> 24(vector) 也就是说v24这个向量寄存器存储中间结果
     if (avl == orig_avl) {
+      // Vector Single-Width Floating-Point Multiply/Divide Instructions
       asm volatile("vfmul.vv v24, v8, v16");
     } else {
+      // Vector Single-Width Floating-Point Fused Multiply-Add Instructions
+      // vfmacc.vv vd, vs1, vs2, vm # vd[i] = +(vs1[i] * vs2[i]) + vd[i]
       asm volatile("vfmacc.vv v24, v8, v16");
     }
 
@@ -52,84 +57,11 @@ double fdotp_v64b(const double *a, const double *b, unsigned int avl) {
   } while (avl > 0);
 
   // Reduce and return
+  // 在此进行sum操作 sum(24) -> v0
   asm volatile("vsetvli zero, %0, e64, m8, ta, ma" ::"r"(orig_avl));
+  // vfredusum.vs vd, vs2, vs1, vm # Unordered sum
   asm volatile("vfredusum.vs v0, v24, v0");
-  asm volatile("vfmv.f.s %0, v0" : "=f"(red));
-
-  return red;
-}
-
-// 64-bit dot-product: a * b
-// m8 allows only for partial register re-allocation with factor-2 unrolling
-double fdotp_v64b_m8_unrl(const double *a, const double *b, unsigned int avl) {
-  const unsigned int orig_avl = avl;
-  unsigned int vl;
-
-  double red;
-
-  // Stripmine and accumulate a partial reduced vector
-  do {
-    // Set the vl
-    asm volatile("vsetvli %0, %1, e64, m8, ta, ma" : "=r"(vl) : "r"(avl));
-
-    // Load chunk a and b
-    asm volatile("vle64.v v8,  (%0)" ::"r"(a));
-    asm volatile("vle64.v v16, (%0)" ::"r"(b));
-
-    // Multiply and accumulate
-    if (avl == orig_avl) {
-      asm volatile("vfmul.vv v24, v8, v16");
-    } else {
-      asm volatile("vfmacc.vv v24, v8, v16");
-    }
-
-    // Bump pointers
-    a += vl;
-    b += vl;
-    avl -= vl;
-
-    if (avl <= 0)
-      break;
-
-    // Set the vl
-    asm volatile("vsetvli %0, %1, e64, m8, ta, ma" : "=r"(vl) : "r"(avl));
-
-    // Load chunk a and b
-    asm volatile("vle64.v v0, (%0)" ::"r"(a));
-    asm volatile("vle64.v v8, (%0)" ::"r"(b));
-
-    // Multiply and accumulate
-    asm volatile("vfmacc.vv v24, v0, v8");
-
-    // Bump pointers
-    a += vl;
-    b += vl;
-    avl -= vl;
-
-    if (avl <= 0)
-      break;
-
-    // Set the vl
-    asm volatile("vsetvli %0, %1, e64, m8, ta, ma" : "=r"(vl) : "r"(avl));
-
-    // Load chunk a and b
-    asm volatile("vle64.v v16, (%0)" ::"r"(a));
-    asm volatile("vle64.v v0, (%0)" ::"r"(b));
-
-    // Multiply and accumulate
-    asm volatile("vfmacc.vv v24, v0, v16");
-
-    // Bump pointers
-    a += vl;
-    b += vl;
-    avl -= vl;
-  } while (avl > 0);
-
-  // Clean the accumulator
-  asm volatile("vmv.s.x v0, zero");
-
-  // Reduce and return
-  asm volatile("vfredusum.vs v0, v24, v0");
+  // vfmv.f.s rd, vs2 # f[rd] = vs2[0] (rs1=0)
   asm volatile("vfmv.f.s %0, v0" : "=f"(red));
 
   return red;

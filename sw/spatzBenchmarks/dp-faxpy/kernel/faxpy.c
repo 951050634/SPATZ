@@ -26,13 +26,20 @@ void faxpy_v64b(const double a, const double *x, const double *y,
   // Stripmine and accumulate a partial vector
   do {
     // Set the vl
+    // ps: vsetvli rd rs1 vtypei , rd = vl, rs1 = AVL, vtypei = new vtype setting
+    //     一个循环的每一次迭代都处理一定量的元素，直到所有元素处理完毕
     asm volatile("vsetvli %0, %1, e64, m8, ta, ma" : "=r"(vl) : "r"(avl));
 
     // Load vectors
+    // ps: vle64.v vd, (rs1), vm 
+    //     从内存地址rs1加载64位元素到向量寄存器vd中
     asm volatile("vle64.v v0, (%0)" ::"r"(x));
     asm volatile("vle64.v v8, (%0)" ::"r"(y));
 
     // Multiply-accumulate
+    // vfmacc.vf vd, rs1, vs2, vm # vd[i] += (f[rs1] * vs2[i])
+    //                              vd += f[rs1] * vs2
+    // 即 y += alpha * x
     asm volatile("vfmacc.vf v8, %0, v0" ::"f"(a));
 
     // Store results
@@ -42,54 +49,6 @@ void faxpy_v64b(const double a, const double *x, const double *y,
     x += vl;
     y += vl;
     avl -= vl;
-  } while (avl > 0);
-}
-
-// Unrolled 64-bit AXPY: y = a * x + y
-void faxpy_v64b_unrl(const double a, const double *x, const double *y,
-                     unsigned int avl) {
-  unsigned int vl;
-  double *y2;
-
-  // Stripmine and accumulate a partial vector
-  do {
-    // Set the vl
-    asm volatile("vsetvli %0, %1, e64, m8, ta, ma" : "=r"(vl) : "r"(avl));
-
-    // Load vectors
-    asm volatile("vle64.v v0, (%0)" ::"r"(x));
-    asm volatile("vle64.v v8, (%0)" ::"r"(y));
-
-    // Multiply-accumulate
-    asm volatile("vfmacc.vf v8, %0, v0" ::"f"(a));
-    avl -= vl;
-    if (avl > 0) {
-      // Set the vl
-      asm volatile("vsetvli %0, %1, e64, m8, ta, ma" : "=r"(vl) : "r"(avl));
-
-      // Load vectors
-      x += vl;
-      asm volatile("vle64.v v16, (%0)" ::"r"(x));
-      y2 = y + vl;
-      asm volatile("vle64.v v24, (%0)" ::"r"(y2));
-
-      // Multiply-accumulate
-      asm volatile("vfmacc.vf v24, %0, v16" ::"f"(a));
-    }
-
-    // Store results
-    asm volatile("vse64.v v8, (%0)" ::"r"(y));
-    if (avl > 0) {
-      // Store results
-      y += vl;
-      asm volatile("vse64.v v24, (%0)" ::"r"(y));
-      avl -= vl;
-    }
-
-    // Bump pointers
-    x += vl;
-    y += vl;
-
   } while (avl > 0);
 }
 

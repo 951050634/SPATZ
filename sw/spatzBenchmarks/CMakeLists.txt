@@ -24,10 +24,6 @@ include_directories(${SNRUNTIME_INCLUDE_DIRS})
 
 add_compile_options(-O3 -g -ffunction-sections)
 
-# Use unrolled spatzBenchmarks
-if (UNROLL)
-add_definitions(-DUNROLL)
-endif()
 
 # Macro to regenerate the golden values and compile a module
 macro(add_spatz_test_oneParam name file param1)
@@ -118,3 +114,30 @@ add_spatz_test_twoParam(dp-fft dp-fft/main.c 128 2)
 
 add_spatz_test_twoParam(sp-fft sp-fft/main.c 256 2)
 add_spatz_test_twoParam(sp-fft sp-fft/main.c 512 2)
+
+
+# for complex number tests (f->c)
+
+add_spatz_test_oneParam(dp-caxpy dp-caxpy/main.c 256)
+add_spatz_test_oneParam(dp-caxpy dp-caxpy/main.c 1024)
+
+add_spatz_test_oneParam(dp-cdotp dp-cdotp/main.c 128)
+add_spatz_test_oneParam(dp-cdotp dp-cdotp/main.c 4096)
+
+add_spatz_test_threeParam(dp-cmatmul dp-cmatmul/main.c 64 64 64)
+
+add_spatz_test_threeParam(sp-cmatmul sp-cmatmul/main.c 64 64 64)
+add_spatz_test_threeParam(sp-cmatmul sp-cmatmul/main.c 64 128 64)
+
+add_spatz_test_threeParam(hp-cmatmul hp-cmatmul/main.c 64 64 64)
+add_spatz_test_threeParam(hp-cmatmul hp-cmatmul/main.c 64 128 64)
+add_spatz_test_threeParam(hp-cmatmul hp-cmatmul/main.c 128 128 128)
+
+add_spatz_test_threeParam(widening-hp-cmatmul widening-hp-cmatmul/main.c 64 64 64)
+add_spatz_test_threeParam(widening-hp-cmatmul widening-hp-cmatmul/main.c 64 128 64)
+add_spatz_test_threeParam(widening-hp-cmatmul widening-hp-cmatmul/main.c 128 128 128)
+
+add_spatz_test_threeParam(widening-bp-cmatmul widening-bp-cmatmul/main.c 64 64 64)
+add_spatz_test_threeParam(widening-bp-cmatmul widening-bp-cmatmul/main.c 64 128 64)
+add_spatz_test_threeParam(widening-bp-cmatmul widening-bp-cmatmul/main.c 128 128 128)
+add_spatz_test_threeParam(widening-bp-cmatmul widening-bp-cmatmul/main.c 128 256 128)

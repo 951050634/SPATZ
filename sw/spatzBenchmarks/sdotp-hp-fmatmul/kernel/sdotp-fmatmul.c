@@ -21,13 +21,19 @@
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
-void matmul(__fp16 *c, const __fp16 *a, const __fp16 *b, const unsigned int M,
-            const unsigned int N, const unsigned int P) {
-  if (M <= 4) {
+void matmul(_Float16 *c, const _Float16 *a, const _Float16 *b, const unsigned int M,
+            const unsigned int N, const unsigned int P)
+{
+  if (M <= 4)
+  {
     matmul_2xVL(c, a, b, 0, M, N, P, 0, P);
-  } else if (M <= 8) {
+  }
+  else if (M <= 8)
+  {
     matmul_4xVL(c, a, b, 0, M, N, P, 0, P);
-  } else {
+  }
+  else
+  {
     matmul_8xVL(c, a, b, 0, M, N, P, 0, P);
   }
 }
@@ -36,35 +42,38 @@ void matmul(__fp16 *c, const __fp16 *a, const __fp16 *b, const unsigned int M,
 // 2xVL
 // ---------------
 
-void matmul_2xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
+void matmul_2xVL(_Float16 *c, const _Float16 *a, const _Float16 *b,
                  const unsigned int m_start, const unsigned int m_end,
                  const unsigned int N, const unsigned int P,
-                 const unsigned int p_start, const unsigned int p_end) {
+                 const unsigned int p_start, const unsigned int p_end)
+{
 
   unsigned int p = p_start;
-  while (p < p_end) {
+  while (p < p_end)
+  {
     // Calculate the vl
     size_t gvl;
     asm volatile("vsetvli %[gvl], %[vl], e16, m8, ta, ma"
                  : [gvl] "=r"(gvl)
                  : [vl] "r"(2 * (p_end - p)));
 
-    const __fp16 *b_ = b + 2 * p;
-    __fp16 *c_ = c + p;
+    const _Float16 *b_ = b + 2 * p;
+    _Float16 *c_ = c + p;
 
     // Account for the used operands
     p += gvl / 2;
 
-    for (unsigned int m = m_start; m < m_end; m += 2) {
+    for (unsigned int m = m_start; m < m_end; m += 2)
+    {
       asm volatile("vsetvli zero, %0, e16, m8, ta, ma" ::"r"(gvl));
 
-      const __fp16 *a_ = a + m * N;
-      const __fp16 *a__ = a_;
+      const _Float16 *a_ = a + m * N;
+      const _Float16 *a__ = a_;
 
       asm volatile("vle16.v v16, (%0);" ::"r"(b_));
-      const __fp16 *b__ = b_ + 2 * P;
+      const _Float16 *b__ = b_ + 2 * P;
 
-      __fp16 *c__ = c_ + m * P;
+      _Float16 *c__ = c_ + m * P;
 
       double t0, t1;
 
@@ -76,7 +85,8 @@ void matmul_2xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
 
       unsigned int n = 0;
 
-      while (n < N) {
+      while (n < N)
+      {
         n += 2;
         a__ = a_ + n;
 
@@ -123,35 +133,38 @@ void matmul_2xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
 // 4xVL
 // ---------------
 
-void matmul_4xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
+void matmul_4xVL(_Float16 *c, const _Float16 *a, const _Float16 *b,
                  const unsigned int m_start, const unsigned int m_end,
                  const unsigned int N, const unsigned int P,
-                 const unsigned int p_start, const unsigned int p_end) {
+                 const unsigned int p_start, const unsigned int p_end)
+{
 
   unsigned int p = p_start;
-  while (p < p_end) {
+  while (p < p_end)
+  {
     // Calculate the vl
     size_t gvl;
     asm volatile("vsetvli %[gvl], %[vl], e16, m4, ta, ma"
                  : [gvl] "=r"(gvl)
                  : [vl] "r"(2 * (p_end - p)));
 
-    const __fp16 *b_ = b + 2 * p;
-    __fp16 *c_ = c + p;
+    const _Float16 *b_ = b + 2 * p;
+    _Float16 *c_ = c + p;
 
     // Account for the used operands
     p += gvl / 2;
 
-    for (unsigned int m = m_start; m < m_end; m += 4) {
+    for (unsigned int m = m_start; m < m_end; m += 4)
+    {
       asm volatile("vsetvli zero, %0, e16, m4, ta, ma" ::"r"(gvl));
 
-      const __fp16 *a_ = a + m * N;
-      const __fp16 *a__ = a_;
+      const _Float16 *a_ = a + m * N;
+      const _Float16 *a__ = a_;
 
       asm volatile("vle16.v v16, (%0);" ::"r"(b_));
-      const __fp16 *b__ = b_ + 2 * P;
+      const _Float16 *b__ = b_ + 2 * P;
 
-      __fp16 *c__ = c_ + m * P;
+      _Float16 *c__ = c_ + m * P;
 
       double t0, t1, t2, t3;
 
@@ -169,7 +182,8 @@ void matmul_4xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
 
       unsigned int n = 0;
 
-      while (n < N) {
+      while (n < N)
+      {
         n += 2;
         a__ = a_ + n;
 
@@ -236,35 +250,38 @@ void matmul_4xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
 // 8xVL
 // ---------------
 
-void matmul_8xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
+void matmul_8xVL(_Float16 *c, const _Float16 *a, const _Float16 *b,
                  const unsigned int m_start, const unsigned int m_end,
                  const unsigned int N, const unsigned int P,
-                 const unsigned int p_start, const unsigned int p_end) {
+                 const unsigned int p_start, const unsigned int p_end)
+{
 
   unsigned int p = p_start;
-  while (p < p_end) {
+  while (p < p_end)
+  {
     // Calculate the vl
     size_t gvl;
     asm volatile("vsetvli %[gvl], %[vl], e16, m2, ta, ma"
                  : [gvl] "=r"(gvl)
                  : [vl] "r"(2 * (p_end - p)));
 
-    const __fp16 *b_ = b + 2 * p;
-    __fp16 *c_ = c + p;
+    const _Float16 *b_ = b + 2 * p;
+    _Float16 *c_ = c + p;
 
     // Account for the used operands
     p += gvl / 2;
 
-    for (unsigned int m = m_start; m < m_end; m += 8) {
+    for (unsigned int m = m_start; m < m_end; m += 8)
+    {
       asm volatile("vsetvli zero, %0, e16, m2, ta, ma" ::"r"(gvl));
 
-      const __fp16 *a_ = a + m * N;
-      const __fp16 *a__ = a_;
+      const _Float16 *a_ = a + m * N;
+      const _Float16 *a__ = a_;
 
       asm volatile("vle16.v v18, (%0);" ::"r"(b_));
-      const __fp16 *b__ = b_ + 2 * P;
+      const _Float16 *b__ = b_ + 2 * P;
 
-      __fp16 *c__ = c_ + m * P;
+      _Float16 *c__ = c_ + m * P;
 
       double t0, t1, t2, t3, t4, t5, t6, t7;
 
@@ -294,7 +311,8 @@ void matmul_8xVL(__fp16 *c, const __fp16 *a, const __fp16 *b,
 
       unsigned int n = 0;
 
-      while (n < N) {
+      while (n < N)
+      {
         n += 2;
         a__ = a_ + n;
 

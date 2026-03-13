@@ -146,7 +146,7 @@ def emit_GEMM_layer(name="gemm", **kwargs):
     layer_str += f'\t.expand = {kwargs["expand"]}\n'
     layer_str += "};\n\n\n"
 
-    ctypes = {"64": "double", "32": "float", "16": "__fp16", "8": "char"}
+    ctypes = {"64": "double", "32": "float", "16": "_Float16", "8": "char"}
 
     dtype = ctypes[str(kwargs["prec"])]
     if dtype != "char":
@@ -308,7 +308,7 @@ def emit_fusedconv(name="fusedconv", **kwargs):
         _, fh, fw, _ = kernel.shape
         ih_pad, iw_pad, _ = ifmap_padded.shape
 
-    ctypes = {"64": "double", "32": "float", "16": "__fp16", "8": "char"}
+    ctypes = {"64": "double", "32": "float", "16": "_Float16", "8": "char"}
 
     dtype = ctypes[str(kwargs["prec"])]
 
