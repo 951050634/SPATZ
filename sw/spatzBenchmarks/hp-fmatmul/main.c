@@ -24,16 +24,19 @@
 #include DATAHEADER
 #include "kernel/hp-fmatmul.c"
 
-__fp16 *a;
-__fp16 *b;
-__fp16 *c;
+_Float16 *a;
+_Float16 *b;
+_Float16 *c;
 
 // Verify the matrices
-int verify_matrix(__fp16 *matrix, const __fp16 *checksum,
-                  const unsigned int num_rows, const unsigned int num_columns) {
-  for (unsigned int i = 0; i < num_rows; ++i) {
+int verify_matrix(_Float16 *matrix, const _Float16 *checksum,
+                  const unsigned int num_rows, const unsigned int num_columns)
+{
+  for (unsigned int i = 0; i < num_rows; ++i)
+  {
     float sum = 0;
-    for (unsigned int j = 0; j < num_columns; ++j) {
+    for (unsigned int j = 0; j < num_columns; ++j)
+    {
       sum += (float)matrix[i * num_columns + j];
     }
 
@@ -42,28 +45,36 @@ int verify_matrix(__fp16 *matrix, const __fp16 *checksum,
       diff = -diff;
 
     float eps;
-    if ((num_rows == 128) && (num_columns == 128)) {
-      if (i == 75) {
+    if ((num_rows == 128) && (num_columns == 128))
+    {
+      if (i == 75)
+      {
         diff = 0; // skip check on this element (catastrophic cancellation in
                   // the last addition producing a large relative error)
         eps = 1;
-      } else {
+      }
+      else
+      {
         eps = 0.15f * (float)checksum[i];
       }
-    } else {
+    }
+    else
+    {
       eps = 0.05f * (float)checksum[i];
     }
     if (eps < 0)
       eps = -eps;
 
-    if (diff > eps) {
+    if (diff > eps)
+    {
       return i == 0 ? -1 : (int)i;
     }
   }
   return 0;
 }
 
-int main() {
+int main()
+{
   const unsigned int num_cores = snrt_cluster_core_num();
   const unsigned int cid = snrt_cluster_core_idx();
 
@@ -76,10 +87,11 @@ int main() {
   unsigned int kernel_size;
 
   // Allocate the matrices in the local tile
-  if (cid == 0) {
-    a = (__fp16 *)snrt_l1alloc(gemm_l.M * gemm_l.K * sizeof(__fp16));
-    b = (__fp16 *)snrt_l1alloc(gemm_l.K * gemm_l.N * sizeof(__fp16));
-    c = (__fp16 *)snrt_l1alloc(gemm_l.M * gemm_l.N * sizeof(__fp16));
+  if (cid == 0)
+  {
+    a = (_Float16 *)snrt_l1alloc(gemm_l.M * gemm_l.K * sizeof(_Float16));
+    b = (_Float16 *)snrt_l1alloc(gemm_l.K * gemm_l.N * sizeof(_Float16));
+    c = (_Float16 *)snrt_l1alloc(gemm_l.M * gemm_l.N * sizeof(_Float16));
   }
 
   // Reset timer
@@ -98,10 +110,11 @@ int main() {
   snrt_cluster_hw_barrier();
 
   // Initialize matrices
-  if (cid == 0) {
-    snrt_dma_start_1d(a, gemm_A_dram, gemm_l.M * gemm_l.K * sizeof(__fp16));
-    snrt_dma_start_1d(b, gemm_B_dram, gemm_l.K * gemm_l.N * sizeof(__fp16));
-    snrt_dma_start_1d(c, gemm_C_dram, gemm_l.M * gemm_l.N * sizeof(__fp16));
+  if (cid == 0)
+  {
+    snrt_dma_start_1d(a, gemm_A_dram, gemm_l.M * gemm_l.K * sizeof(_Float16));
+    snrt_dma_start_1d(b, gemm_B_dram, gemm_l.K * gemm_l.N * sizeof(_Float16));
+    snrt_dma_start_1d(c, gemm_C_dram, gemm_l.M * gemm_l.N * sizeof(_Float16));
     snrt_dma_wait_all();
   }
 
@@ -109,7 +122,8 @@ int main() {
   snrt_cluster_hw_barrier();
 
   // Calculate matmul
-  for (unsigned int i = 0; i < measure_iterations; ++i) {
+  for (unsigned int i = 0; i < measure_iterations; ++i)
+  {
     // Start timer
     timer_start = benchmark_get_cycle();
 
@@ -117,13 +131,20 @@ int main() {
     if (cid == 0)
       start_kernel();
 
-    if (kernel_size == 2) {
+    if (kernel_size == 2)
+    {
       matmul_2xVL(c, a, b, m_start, m_end, gemm_l.K, gemm_l.N, p_start, p_end);
-    } else if (kernel_size == 4) {
+    }
+    else if (kernel_size == 4)
+    {
       matmul_4xVL(c, a, b, m_start, m_end, gemm_l.K, gemm_l.N, p_start, p_end);
-    } else if (kernel_size == 8) {
+    }
+    else if (kernel_size == 8)
+    {
       matmul_8xVL(c, a, b, m_start, m_end, gemm_l.K, gemm_l.N, p_start, p_end);
-    } else {
+    }
+    else
+    {
       return -2;
     }
 
@@ -137,15 +158,18 @@ int main() {
     // End timer and check if new best runtime
     timer_end = benchmark_get_cycle();
     unsigned int timer_temp = timer_end - timer_start;
-    if (cid == 0) {
-      if (timer_temp < timer) {
+    if (cid == 0)
+    {
+      if (timer_temp < timer)
+      {
         timer = timer_temp;
       }
     }
   }
 
   // Check and display results
-  if (cid == 0) {
+  if (cid == 0)
+  {
     long unsigned int performance =
         1000 * 2 * gemm_l.M * gemm_l.N * gemm_l.K / timer;
     long unsigned int utilization =
@@ -157,11 +181,13 @@ int main() {
            performance, utilization);
   }
 
-  if (cid == 0) {
+  if (cid == 0)
+  {
     int error =
-        verify_matrix(c, (const __fp16 *)gemm_checksum, gemm_l.M, gemm_l.N);
+        verify_matrix(c, (const _Float16 *)gemm_checksum, gemm_l.M, gemm_l.N);
 
-    if (error != 0) {
+    if (error != 0)
+    {
       PRINTF("Error core %d: c[%d]=%u\n", cid, error, (int)c[error]);
       return error;
     }

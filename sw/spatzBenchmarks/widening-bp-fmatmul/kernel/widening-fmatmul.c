@@ -22,12 +22,18 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 void matmul(char *c, const char *a, const char *b, const unsigned int M,
-            const unsigned int N, const unsigned int P) {
-  if (M <= 4) {
+            const unsigned int N, const unsigned int P)
+{
+  if (M <= 4)
+  {
     matmul_2xVL(c, a, b, 0, M, N, P, 0, P);
-  } else if (M <= 8) {
+  }
+  else if (M <= 8)
+  {
     matmul_4xVL(c, a, b, 0, M, N, P, 0, P);
-  } else {
+  }
+  else
+  {
     matmul_8xVL(c, a, b, 0, M, N, P, 0, P);
   }
 }
@@ -35,14 +41,16 @@ void matmul(char *c, const char *a, const char *b, const unsigned int M,
 // ---------------
 // 2xVL
 // ---------------
-
+// bp = 8bit
 void matmul_2xVL(char *c, const char *a, const char *b,
                  const unsigned int m_start, const unsigned int m_end,
                  const unsigned int N, const unsigned int P,
-                 const unsigned int p_start, const unsigned int p_end) {
+                 const unsigned int p_start, const unsigned int p_end)
+{
 
   unsigned int p = p_start;
-  while (p < p_end) {
+  while (p < p_end)
+  {
     // Calculate the vl
     size_t gvl;
     asm volatile("vsetvli %[gvl], %[vl], e8, m4, ta, ma"
@@ -52,7 +60,8 @@ void matmul_2xVL(char *c, const char *a, const char *b,
     const char *b_ = b + p;
     char *c_ = c + p;
 
-    for (unsigned int m = m_start; m < m_end; m += 2) {
+    for (unsigned int m = m_start; m < m_end; m += 2)
+    {
       const char *a_ = a + m * N;
       const char *a__ = a_;
 
@@ -75,7 +84,8 @@ void matmul_2xVL(char *c, const char *a, const char *b,
 
       unsigned int n = 0;
 
-      while (n < N) {
+      while (n < N)
+      {
         a__ = a_ + ++n;
 
         asm volatile("vle8.v v24, (%0);" ::"r"(b__));
@@ -122,10 +132,12 @@ void matmul_2xVL(char *c, const char *a, const char *b,
 void matmul_4xVL(char *c, const char *a, const char *b,
                  const unsigned int m_start, const unsigned int m_end,
                  const unsigned int N, const unsigned int P,
-                 const unsigned int p_start, const unsigned int p_end) {
+                 const unsigned int p_start, const unsigned int p_end)
+{
 
   unsigned int p = p_start;
-  while (p < p_end) {
+  while (p < p_end)
+  {
     // Calculate the vl
     size_t gvl;
     asm volatile("vsetvli %[gvl], %[vl], e8, m2, ta, ma"
@@ -135,7 +147,8 @@ void matmul_4xVL(char *c, const char *a, const char *b,
     const char *b_ = b + p;
     char *c_ = c + p;
 
-    for (unsigned int m = m_start; m < m_end; m += 4) {
+    for (unsigned int m = m_start; m < m_end; m += 4)
+    {
       const char *a_ = a + m * N;
       const char *a__ = a_;
 
@@ -164,7 +177,8 @@ void matmul_4xVL(char *c, const char *a, const char *b,
 
       unsigned int n = 0;
 
-      while (n < N) {
+      while (n < N)
+      {
         a__ = a_ + ++n;
 
         asm volatile("vle8.v v20, (%0);" ::"r"(b__));
@@ -231,10 +245,12 @@ void matmul_4xVL(char *c, const char *a, const char *b,
 void matmul_8xVL(char *c, const char *a, const char *b,
                  const unsigned int m_start, const unsigned int m_end,
                  const unsigned int N, const unsigned int P,
-                 const unsigned int p_start, const unsigned int p_end) {
+                 const unsigned int p_start, const unsigned int p_end)
+{
 
   unsigned int p = p_start;
-  while (p < p_end) {
+  while (p < p_end)
+  {
     // Calculate the vl
     size_t gvl;
     asm volatile("vsetvli %[gvl], %[vl], e8, m1, ta, ma"
@@ -244,7 +260,8 @@ void matmul_8xVL(char *c, const char *a, const char *b,
     const char *b_ = b + p;
     char *c_ = c + p;
 
-    for (unsigned int m = m_start; m < m_end; m += 8) {
+    for (unsigned int m = m_start; m < m_end; m += 8)
+    {
       const char *a_ = a + m * N;
       const char *a__ = a_;
 
@@ -285,7 +302,8 @@ void matmul_8xVL(char *c, const char *a, const char *b,
 
       unsigned int n = 0;
 
-      while (n < N) {
+      while (n < N)
+      {
         a__ = a_ + ++n;
 
         asm volatile("vle8.v v20, (%0);" ::"r"(b__));

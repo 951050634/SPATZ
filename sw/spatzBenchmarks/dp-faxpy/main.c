@@ -62,7 +62,6 @@ int main() {
 
     snrt_dma_start_1d(x, axpy_X_dram, dim * sizeof(double));
     snrt_dma_start_1d(y, axpy_Y_dram, dim * sizeof(double));
-    snrt_dma_wait_all();
   }
 
   // Wait for all cores to finish
@@ -83,12 +82,8 @@ int main() {
   if (cid == 0)
     timer = benchmark_get_cycle();
 
-    // Call AXPY
-#ifdef UNROLL
-  faxpy_v64b_unrl(*a, x_int, y_int, dim_core);
-#else
+  // Call AXPY
   faxpy_v64b(*a, x_int, y_int, dim_core);
-#endif
 
   // Wait for all cores to finish
   snrt_cluster_hw_barrier();

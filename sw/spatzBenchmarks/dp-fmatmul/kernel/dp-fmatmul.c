@@ -21,13 +21,28 @@
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
+/*
+  寄存器分配：
+  累加器 : v0 - v7 : C矩阵第m行部分和
+          v8 - v15 : C矩阵第m+1行部分和
+  操作数B : v16 - v23 : B矩阵第n行的数据
+            v24 - v31 : B矩阵第n+1行的数据
+  操作数A : 使用标量寄存器t0和t1，通过广播(.vf后缀)参与计算
+*/
+
 void matmul(double *c, const double *a, const double *b, const unsigned int M,
-            const unsigned int N, const unsigned int P) {
-  if (M <= 4) {
+            const unsigned int N, const unsigned int P)
+{
+  if (M <= 4)
+  {
     matmul_2xVL(c, a, b, 0, M, N, P, 0, P);
-  } else if (M <= 8) {
+  }
+  else if (M <= 8)
+  {
     matmul_4xVL(c, a, b, 0, M, N, P, 0, P);
-  } else {
+  }
+  else
+  {
     matmul_8xVL(c, a, b, 0, M, N, P, 0, P);
   }
 }
@@ -39,10 +54,18 @@ void matmul(double *c, const double *a, const double *b, const unsigned int M,
 void matmul_2xVL(double *c, const double *a, const double *b,
                  const unsigned int m_start, const unsigned int m_end,
                  const unsigned int N, const unsigned int P,
-                 const unsigned int p_start, const unsigned int p_end) {
-
+                 const unsigned int p_start, const unsigned int p_end)
+{
+  /*
+    c a b : 指向矩阵数据的指针
+    m_start, m_end : 计算A的哪些行
+    N : 矩阵A的列数 / 矩阵B的行数
+    P : 矩阵B的列数 / 矩阵C的列数
+    p_start, p_end : 计算B的哪些列
+  */
   unsigned int p = p_start;
-  while (p < p_end) {
+  while (p < p_end)
+  {
     // Calculate the vl
     size_t gvl;
     asm volatile("vsetvli %[gvl], %[vl], e64, m8, ta, ma"
@@ -52,36 +75,42 @@ void matmul_2xVL(double *c, const double *a, const double *b,
     const double *b_ = b + p;
     double *c_ = c + p;
 
-    for (unsigned int m = m_start; m < m_end; m += 2) {
-      const double *a_ = a + m * N;
-      const double *a__ = a_;
+    // 2xVL -> m += 2
+    for (unsigned int m = m_start; m < m_end; m += 2)
+    {
+      const double *a_ = a + m * N; // A矩阵m行的起始位置
+      const double *a__ = a_;       // 遍历本行用
 
-      asm volatile("vle64.v v16, (%0);" ::"r"(b_));
-      const double *b__ = b_ + P;
+      asm volatile("vle64.v v16, (%0);" ::"r"(b_)); // v16 - v23，计算v16
+      const double *b__ = b_ + P;                   // B矩阵的下一行，准备压入v24
 
-      double *c__ = c_ + m * P;
+      double *c__ = c_ + m * P; // C矩阵中计算结果的位置
 
       double t0, t1;
 
-      t0 = *a__;
+      t0 = *a__; // a[m][0]
       a__ += N;
-      t1 = *a__;
+      t1 = *a__; // a[m+1][0]，至此完成A的第一列标量的预加载
 
-      unsigned int n = 0;
+      unsigned int n = 0; // 沿第n维度（A的列，B的行）遍历
 
-      while (n < N) {
-        a__ = a_ + ++n;
+      while (n < N)
+      {
+        a__ = a_ + ++n; // 处理当前n，预加载n+1
 
-        asm volatile("vle64.v v24, (%0);" ::"r"(b__));
-        b__ += P;
+        asm volatile("vle64.v v24, (%0);" ::"r"(b__)); // 双缓冲（预加载），计算v16的过程中将v24读入
+        b__ += P;                                      // 准备压入第二轮v16
 
-        if (n == 1) {
+        if (n == 1) // 特判n=1，如果是第一次计算，使用vfmul（覆盖写）初始化，对应C = A x B，而非C += A x B
+        {
           asm volatile("vfmul.vf v0, v16, %0" ::"f"(t0));
           t0 = *a__;
           a__ += N;
           asm volatile("vfmul.vf v8, v16, %0" ::"f"(t1));
           t1 = *a__;
-        } else {
+        }
+        else // vfmacc进行累加
+        {
           asm volatile("vfmacc.vf v0, %0, v16" ::"f"(t0));
           t0 = *a__;
           a__ += N;
@@ -89,10 +118,10 @@ void matmul_2xVL(double *c, const double *a, const double *b,
           t1 = *a__;
         }
 
-        a__ = a_ + ++n;
+        a__ = a_ + ++n; // 处理n+1，预加载n+2
 
         if (n == N)
-          break;
+          break; // 结束循环
 
         asm volatile("vle64.v v16, (%0);" ::"r"(b__));
         b__ += P;
@@ -104,6 +133,7 @@ void matmul_2xVL(double *c, const double *a, const double *b,
         t1 = *a__;
       }
 
+      // 由于循环是预加载，所以最后一次计算未完成，此处补全计算，并将结果写入C
       asm volatile("vfmacc.vf v0, %0, v24" ::"f"(t0));
       asm volatile("vse64.v v0, (%0);" ::"r"(c__));
       c__ += P;
@@ -122,10 +152,12 @@ void matmul_2xVL(double *c, const double *a, const double *b,
 void matmul_4xVL(double *c, const double *a, const double *b,
                  const unsigned int m_start, const unsigned int m_end,
                  const unsigned int N, const unsigned int P,
-                 const unsigned int p_start, const unsigned int p_end) {
+                 const unsigned int p_start, const unsigned int p_end)
+{
 
   unsigned int p = p_start;
-  while (p < p_end) {
+  while (p < p_end)
+  {
     // Calculate the vl
     size_t gvl;
     asm volatile("vsetvli %[gvl], %[vl], e64, m4, ta, ma"
@@ -135,7 +167,8 @@ void matmul_4xVL(double *c, const double *a, const double *b,
     const double *b_ = b + p;
     double *c_ = c + p;
 
-    for (unsigned int m = m_start; m < m_end; m += 4) {
+    for (unsigned int m = m_start; m < m_end; m += 4)
+    {
       const double *a_ = a + m * N;
       const double *a__ = a_;
 
@@ -156,13 +189,15 @@ void matmul_4xVL(double *c, const double *a, const double *b,
 
       unsigned int n = 0;
 
-      while (n < N) {
+      while (n < N)
+      {
         asm volatile("vle64.v v20, (%0);" ::"r"(b__));
         b__ += P;
 
         a__ = a_ + ++n;
 
-        if (n == 1) {
+        if (n == 1)
+        {
           asm volatile("vfmul.vf v0, v16, %0" ::"f"(t0));
           t0 = *a__;
           a__ += N;
@@ -174,7 +209,9 @@ void matmul_4xVL(double *c, const double *a, const double *b,
           a__ += N;
           asm volatile("vfmul.vf v12, v16, %0" ::"f"(t3));
           t3 = *a__;
-        } else {
+        }
+        else
+        {
           asm volatile("vfmacc.vf v0, %0, v16" ::"f"(t0));
           t0 = *a__;
           a__ += N;
@@ -233,10 +270,12 @@ void matmul_4xVL(double *c, const double *a, const double *b,
 void matmul_8xVL(double *c, const double *a, const double *b,
                  const unsigned int m_start, const unsigned int m_end,
                  const unsigned int N, const unsigned int P,
-                 const unsigned int p_start, const unsigned int p_end) {
+                 const unsigned int p_start, const unsigned int p_end)
+{
 
   unsigned int p = p_start;
-  while (p < p_end) {
+  while (p < p_end)
+  {
     // Calculate the vl
     size_t gvl;
     asm volatile("vsetvli %[gvl], %[vl], e64, m2, ta, ma"
@@ -246,7 +285,8 @@ void matmul_8xVL(double *c, const double *a, const double *b,
     const double *b_ = b + p;
     double *c_ = c + p;
 
-    for (unsigned int m = m_start; m < m_end; m += 8) {
+    for (unsigned int m = m_start; m < m_end; m += 8)
+    {
       const double *a_ = a + m * N;
       const double *a__ = a_;
 
@@ -275,13 +315,15 @@ void matmul_8xVL(double *c, const double *a, const double *b,
 
       unsigned int n = 0;
 
-      while (n < N) {
+      while (n < N)
+      {
         a__ = a_ + ++n;
 
         asm volatile("vle64.v v20, (%0);" ::"r"(b__));
         b__ += P;
 
-        if (n == 1) {
+        if (n == 1)
+        {
           asm volatile("vfmul.vf v0, v18, %0" ::"f"(t0));
           t0 = *a__;
           a__ += N;
@@ -305,7 +347,9 @@ void matmul_8xVL(double *c, const double *a, const double *b,
           a__ += N;
           asm volatile("vfmul.vf v14, v18, %0" ::"f"(t7));
           t7 = *a__;
-        } else {
+        }
+        else
+        {
           asm volatile("vfmacc.vf v0, %0, v18" ::"f"(t0));
           t0 = *a__;
           a__ += N;
