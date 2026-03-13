@@ -248,6 +248,13 @@ clean: clean.vcs clean.vlt clean.vsim clean.sw
 clean.logs:
 	rm -rf logs/
 
+
+##########
+# mytest #
+##########
+mytest:
+	cd sw/build && ctest -R $(TEST)
+
 ## Help command
 .DEFAULT_GOAL := help
 Blue=\033[1;34m

@@ -108,11 +108,11 @@ def plot_cycles(rows, out_path: Path):
 
 def main():
     base_dir = Path(__file__).resolve().parent
-    csv_path = base_dir / "results_axpy_compare.csv"
-    out_dir = base_dir / "pic"
+    data_dir = base_dir.parent / "data"
+    out_dir = base_dir.parent / "pic"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    rows = load_rows(csv_path)
+    rows = load_rows(data_dir / "results_axpy_compare.csv")
     plot_time(rows, out_dir / "axpy_compare_time.png")
     plot_cycles(rows, out_dir / "axpy_compare_cycles.png")
     print(f"Generated plots in: {out_dir}")
