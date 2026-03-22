@@ -74,3 +74,46 @@
 - 两个第一版问题本质一致：大规模复数数据在 L1/TCDM 的驻留策略不合理，触发访存异常。
 - 排查方法核心是“异常日志 + 内存预算 + 版本对比 + trace 验证”四步闭环。
 - 工程建议：对复数大数组用例默认采用分块 DMA 与块内校验，避免一次性全量驻留。
+
+## 5. 硬件波形证据（已实装）
+
+### 5.1 目标
+
+- 面向汇报质疑“是否纯软件实现”，补充硬件执行证据链：
+  - RTL 波形（VCD）展示硬件信号活动；
+  - trace 展示加速相关事件；
+  - 两者来自同一次仿真运行。
+
+### 5.2 实施内容
+
+1. 在 `testharness` 的 VCD 区块补充默认文件名宏（避免命令行字符串宏转义失败）：
+   - 当定义 `VCD_DUMP` 且未定义 `VCD_DUMP_FILE` 时，默认输出 `dump.vcd`。
+2. 在构建脚本中增加条件开关：当 `DEFS` 包含 `-DVCD_DUMP` 时自动追加 Verilator `--trace`。
+3. 运行用例：`test-spatzBenchmarks-dp-cdotp_ver2_M128`。
+
+### 5.3 实测产物
+
+- 波形文件：`hw/system/spatz_cluster/dump.vcd`（约 15 MB）。
+- 指令与事件 trace：
+  - `hw/system/spatz_cluster/logs/trace_hart_00000.dasm`
+  - `hw/system/spatz_cluster/logs/trace_hart_00001.dasm`
+- 仿真结果：`[SUCCESS] Program finished successfully`。
+
+### 5.4 量化结果（本次运行）
+
+- 周期（取每个 hart trace 第 2 列最大值）：
+  - `hart0_max_cycle = 3404`
+  - `hart1_max_cycle = 3392`
+- 加速相关事件计数（来自 trace 中字段统计）：
+  - `hart0_fpu_offload_events = 69`
+  - `hart0_retire_acc_events = 35`
+  - `hart1_fpu_offload_events = 69`
+  - `hart1_retire_acc_events = 16`
+
+### 5.5 汇报建议（如何展示）
+
+1. 打开 `dump.vcd`，优先展示 `cluster_probe` 的采样窗口。
+2. 在同一时间窗展示 Spatz/加速路径握手信号翻转（valid/ready/busy 类信号）。
+3. 旁证给出上述 `fpu_offload`/`retire_acc` 统计与 max cycle，说明“硬件确实参与执行”。
+
+> 注：该证据链用于证明“存在硬件执行活动”，不直接等价于完整性能评估结论。

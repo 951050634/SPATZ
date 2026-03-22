@@ -59,6 +59,9 @@ VLT_FLAGS    += -Wno-PINMISSING
 VLT_FLAGS    += -Wno-fatal
 VLT_FLAGS    += --unroll-count 1024
 VLT_FLAGS    += --timing
+ifneq ($(findstring -DVCD_DUMP,$(DEFS)),)
+VLT_FLAGS    += --trace
+endif
 VLT_BENDER   += -t rtl -t spatz -t spatz_test -t snitch_test --define COMMON_CELLS_ASSERTS_OFF
 VLT_SOURCES  := $(shell ${BENDER} script flist ${VLT_BENDER} | ${SED_SRCS})
 VLT_CFLAGS   += -std=c++17 -fcoroutines
