@@ -93,6 +93,45 @@
   - `data_process/pic/dotp_compare_time.png`
   - `data_process/pic/dotp_compare_cycles.png`
 
+## DOTP 公平口径修正（不覆盖旧结果）
+
+### 修正背景
+
+- 旧版 `dotp_compare_*` 直接在相同 `M` 下对比 real/complex 的原始时间与周期。
+- 但 complex 每个元素的计算量明显更高（按本报告口径约为 real 的 4 倍 FLOPs），直接比较会造成“complex 看起来更快”的误读。
+
+### 修正方法
+
+- 保留旧数据与旧图，新增 `fair` 数据链路，不覆盖原结果。
+- 在 `results_dotp_compare_fair.csv` 中新增：
+  - `real_work_items`（real=`M`，complex=`2*M`）
+  - `flops`（real=`2*M`，complex=`8*M`）
+  - 单位工作量指标（`sec_per_real_item` / `cycle_per_real_item` 等）
+  - 复杂度校正指标：`adjusted_time_sec` / `adjusted_cycle`
+- 复杂度校正规则：`non-complex x1`，`complex x4`。
+
+### 修正后结论（复杂度校正图）
+
+- 在 `M=128`：
+  - non-complex `adjusted_time_sec = 1.57`，complex `adjusted_time_sec = 5.80`
+  - non-complex `adjusted_cycle = 3697`，complex `adjusted_cycle = 13616`
+- 在 `M=4096`：
+  - non-complex `adjusted_time_sec = 2.75`，complex `adjusted_time_sec = 9.64`
+  - non-complex `adjusted_cycle = 5784`，complex `adjusted_cycle = 20280`
+- 结论：在统一复杂度口径下，complex DOTP 高于 real DOTP，符合预期。
+
+### 新增数据与图表文件（fair）
+
+- 新数据：
+  - `data_process/data/results_dotp_compare_fair.csv`
+- 新图像：
+  - `data_process/pic/dotp_compare_fair_time_per_real_item.png`
+  - `data_process/pic/dotp_compare_fair_cycle_per_real_item.png`
+  - `data_process/pic/dotp_compare_fair_time_per_gflop.png`
+  - `data_process/pic/dotp_compare_fair_cycle_per_kflop.png`
+  - `data_process/pic/dotp_compare_fair_time_adjusted.png`
+  - `data_process/pic/dotp_compare_fair_cycles_adjusted.png`
+
 # Spatz MATMUL 对比报告
 
 ## 范围
