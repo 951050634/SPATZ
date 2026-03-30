@@ -1,0 +1,7 @@
+type,test_name,M,status,test_time_sec,max_cycle_hart0,max_cycle_hart1,max_cycle
+non-complex-aligned,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-fdotp_aligned_M128,128,PASS,1.75,3866,3860,3866
+non-complex-aligned,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-fdotp_aligned_M1024,1024,PASS,2.12,4348,4342,4348
+non-complex-aligned,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-fdotp_aligned_M2048,2048,PASS,2.67,5335,5329,5335
+complex-aligned,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-cdotp_aligned_M128,128,PASS,45.03,3404,3392,3404
+complex-aligned,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-cdotp_aligned_M1024,1024,PASS,45.01,4363,4351,4363
+complex-aligned,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-cdotp_aligned_M2048,2048,PASS,45.03,5051,5063,5063

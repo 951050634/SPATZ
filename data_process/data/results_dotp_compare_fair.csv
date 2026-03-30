@@ -1,0 +1,5 @@
+type,test_name,M,status,test_time_sec,max_cycle,real_work_items,flops,sec_per_real_item,cycle_per_real_item,sec_per_gflop,cycle_per_kflop,complexity_factor_vs_real,adjusted_time_sec,adjusted_cycle
+complex,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-cdotp_ver2_M128,128,PASS,1.450000,3404,256,1024,0.005664062500,13.296875000000,1416015.625000,3324.218750,4.0,5.800000,13616.000
+non-complex,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-fdotp_M128,128,PASS,1.570000,3697,128,256,0.012265625000,28.882812500000,6132812.500000,14441.406250,1.0,1.570000,3697.000
+complex,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-cdotp_ver2_M4096,4096,PASS,2.410000,5070,8192,32768,0.000294189453,0.618896484375,73547.363281,154.724121,4.0,9.640000,20280.000
+non-complex,spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-fdotp_M4096,4096,PASS,2.750000,5784,4096,8192,0.000671386719,1.412109375000,335693.359375,706.054688,1.0,2.750000,5784.000
