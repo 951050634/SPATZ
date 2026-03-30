@@ -25,9 +25,9 @@ BENDER ?= ${BENDER_INSTALL_DIR}/bender
 DASM   ?= ${SPIKE_INSTALL_DIR}/bin/spike-dasm
 VLT    ?= ${VERILATOR_INSTALL_DIR}/bin/verilator_bin
 CMAKE  ?= cmake-3.18.1
-PYTHON ?= python3.6
-CC     ?= gcc-11.2.0
-CXX    ?= g++-11.2.0
+PYTHON ?= python3
+CC     ?= gcc
+CXX    ?= g++
 
 MATCH_END := '/+incdir+/ s/$$/\/*\/*/'
 MATCH_BGN := 's/+incdir+//g'
@@ -108,11 +108,19 @@ $(VLT_FESVR)/${FESVR_VERSION}_unzip:
 	tar xfm $(dir $@)${FESVR_VERSION} --strip-components=1 -C $(dir $@)
 	touch $@
 
-$(VLT_BUILDDIR)/lib/libfesvr.a: $(VLT_FESVR)/${FESVR_VERSION}_unzip
-	cd $(dir $<)/ && PATH=${SPIKE_INSTALL_DIR}/bin:${PATH} ./configure --prefix `pwd`
-	$(MAKE) -C $(dir $<) install-config-hdrs install-hdrs libfesvr.a
-	mkdir -p $(dir $@)
-	cp $(dir $<)libfesvr.a $@
+$(VLT_BUILDDIR)/lib/libfesvr.a:
+	if [ -f "${SPIKE_INSTALL_DIR}/lib/libfesvr.a" ]; then \
+		mkdir -p $(dir $@) ${VLT_FESVR}; \
+		cp ${SPIKE_INSTALL_DIR}/lib/libfesvr.a $@; \
+		cp -a ${SPIKE_INSTALL_DIR}/include/. ${VLT_FESVR}/; \
+		touch ${VLT_FESVR}/${FESVR_VERSION}_unzip; \
+	else \
+		$(MAKE) ${VLT_FESVR}/${FESVR_VERSION}_unzip; \
+		cd ${VLT_FESVR}/ && PATH=${SPIKE_INSTALL_DIR}/bin:${PATH} ./configure --prefix `pwd`; \
+		$(MAKE) -C ${VLT_FESVR}/ install-config-hdrs install-hdrs libfesvr.a; \
+		mkdir -p $(dir $@); \
+		cp ${VLT_FESVR}/libfesvr.a $@; \
+	fi
 
 #############
 # Verilator #

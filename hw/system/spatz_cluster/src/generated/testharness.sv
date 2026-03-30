@@ -58,10 +58,6 @@ module testharness (
  **************/
 
 `ifdef VCD_DUMP
-`ifndef VCD_DUMP_FILE
-`define VCD_DUMP_FILE "dump.vcd"
-`endif
-
   initial begin: vcd_dump
     // Wait for the reset
     wait (rst_ni);
