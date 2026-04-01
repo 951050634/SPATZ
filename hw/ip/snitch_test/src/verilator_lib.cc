@@ -4,11 +4,14 @@
 
 #include <printf.h>
 
+#include <cstdlib>
+
 #include "Vtestharness.h"
 #include "Vtestharness__Dpi.h"
 #include "sim.hh"
 #include "tb_lib.hh"
 #include "verilated.h"
+#include "verilated_vcd_c.h"
 namespace sim {
 
 Sim* s;
@@ -48,6 +51,18 @@ void Sim::main() {
 
     // Allocate the simulation state.
     auto top = std::make_unique<Vtestharness>();
+    std::unique_ptr<VerilatedVcdC> trace;
+
+    const char* trace_env = std::getenv("SNITCH_TRACE");
+    const bool trace_enabled = trace_env && trace_env[0] != '\0' && trace_env[0] != '0';
+    if (trace_enabled) {
+        const char* trace_file_env = std::getenv("SNITCH_TRACE_FILE");
+        const char* trace_file =
+            (trace_file_env && trace_file_env[0] != '\0') ? trace_file_env : "dump.vcd";
+        trace = std::make_unique<VerilatedVcdC>();
+        top->trace(trace.get(), 99);
+        trace->open(trace_file);
+    }
 
     bool clk_i = 0, rst_ni = 0;
 
@@ -58,12 +73,20 @@ void Sim::main() {
         top->rst_ni = rst_ni;
         // Evaluate the DUT.
         top->eval();
+        if (trace) {
+            trace->dump(TIME);
+        }
         // Increase global time.
         TIME++;
         // Switch to the HTIF interface in regular intervals.
         if (TIME % HTIFTimeInterval == 0) {
             host->switch_to();
         }
+    }
+
+    if (trace) {
+        trace->flush();
+        trace->close();
     }
 }
 }  // namespace sim

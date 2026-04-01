@@ -1,4 +1,4 @@
 test_name,M,status,test_time_sec,max_cycle_hart0,max_cycle_hart1,max_cycle
-spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-cdotp_aligned_M128,128,PASS,45.03,3404,3392,3404
-spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-cdotp_aligned_M1024,1024,PASS,45.01,4363,4351,4363
-spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-cdotp_aligned_M2048,2048,PASS,45.03,5051,5063,5063
+spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-cdotp_aligned_M128,128,PASS,120.04,3404,3404,3404
+spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-cdotp_aligned_M1024,1024,PASS,120.02,4363,4363,4363
+spatzBenchmarks-rtl-spatzBenchmarks-rtl-dp-cdotp_aligned_M2048,2048,PASS,120.03,5063,5063,5063
