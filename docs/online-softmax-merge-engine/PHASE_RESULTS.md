@@ -203,6 +203,9 @@
 - 2026-05-25 benchmark 增加 `run_stride_zero_case()`，使用 packed vector
   buffers 和 `MERGE_STRIDE=0` 覆盖 RTL 中 `stride==0` 表示 `D * 4` 默认
   row stride 的路径。
+- 2026-05-25 benchmark 有效 case 改为通过 `smu_wait_observe_busy()` 等待，
+  要求每个完成的有效 engine run 至少观测到一次 `MERGE_STATUS.busy=1`，
+  补强 `start` 后 busy 可见性的验收证据。
 
 备注：
 
@@ -271,3 +274,10 @@
   `ctest -R online-softmax-merge --output-on-failure`，1/1 测试通过，总耗时
   116.51 秒，覆盖有效 case、zero-stride packed-layout case、非法配置
   error-path case 和 unsupported mixed-scalar error-path case。
+- 2026-05-25 新增 busy-observed benchmark check 后，重新运行
+  `make -C hw/system/spatz_cluster sw.vlt`，软件全量构建完成，命令退出码为
+  0。
+- 2026-05-25 在 `hw/system/spatz_cluster/sw/build` 重新运行
+  `ctest -R online-softmax-merge --output-on-failure`，1/1 测试通过，总耗时
+  116.35 秒，证明所有有效 engine run 在完成前至少观测到一次
+  `MERGE_STATUS.busy=1`。

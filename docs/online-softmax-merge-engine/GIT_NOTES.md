@@ -185,3 +185,47 @@ online-softmax-merge 单项 CTest 1/1 通过，总耗时 116.51 秒。
 ```text
 暂无。
 ```
+
+## 2026-05-25 Busy-status 观测记录
+
+本轮计划提交：
+
+```text
+[smu] Check merge engine busy status
+```
+
+范围：
+
+```text
+M  docs/online-softmax-merge-engine/PHASE_RESULTS.md
+M  docs/online-softmax-merge-engine/GIT_NOTES.md
+M  sw/spatzBenchmarks/online-softmax-merge/main.c
+```
+
+目的：
+
+- 保留 `smu_wait(void)` 软件 API。
+- 新增内部等待 helper，在有效 engine run 完成前记录是否观测到
+  `MERGE_STATUS.busy=1`。
+- 对 regular stride 和 zero-stride packed-layout 有效 case 均要求 busy 至少被
+  观测到一次，补强 PLAN Node 3 的 `start` 后 busy 可见性验收证据。
+
+验证：
+
+```text
+make -C hw/system/spatz_cluster sw.vlt
+ctest -R online-softmax-merge --output-on-failure
+```
+
+结果：
+
+```text
+sw.vlt 软件全量构建完成，退出码 0。
+online-softmax-merge 单项 CTest 1/1 通过，总耗时 116.35 秒。
+```
+
+网络相关 Git 操作：
+
+```text
+暂无。
+```

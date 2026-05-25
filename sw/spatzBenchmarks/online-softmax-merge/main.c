@@ -106,10 +106,14 @@ static void smu_clear_done(void) {
       (1u << SPATZ_CLUSTER_PERIPHERAL_MERGE_CTRL_CLEAR_DONE_BIT);
 }
 
-int smu_wait(void) {
+static int smu_wait_observe_busy(int *saw_busy) {
   const uint32_t max_polls = 1000000u;
+  *saw_busy = 0;
   for (uint32_t i = 0; i < max_polls; i++) {
     uint32_t status = smu_status();
+    if ((status >> SPATZ_CLUSTER_PERIPHERAL_MERGE_STATUS_BUSY_BIT) & 1u) {
+      *saw_busy = 1;
+    }
     if ((status >> SPATZ_CLUSTER_PERIPHERAL_MERGE_STATUS_DONE_BIT) & 1u) {
       return 0;
     }
@@ -119,6 +123,11 @@ int smu_wait(void) {
   }
   PRINTF("SMU timeout, status=0x%x\n", smu_status());
   return -1;
+}
+
+int smu_wait(void) {
+  int saw_busy;
+  return smu_wait_observe_busy(&saw_busy);
 }
 
 static void init_case(uint32_t n, uint32_t d, uint32_t case_id) {
@@ -335,7 +344,8 @@ static int run_case(uint32_t n, uint32_t d, uint32_t case_id) {
   smu_start(buf->m_old, buf->l_old, &buf->o_old[0][0], buf->m_tile, buf->l_tile,
             &buf->o_tile[0][0], buf->m_out, buf->l_out, &buf->o_out[0][0], n, d,
             MAX_D * sizeof(float));
-  int wait_rc = smu_wait();
+  int saw_busy;
+  int wait_rc = smu_wait_observe_busy(&saw_busy);
   uint32_t engine_cycles = benchmark_get_cycle() - engine_start;
   snrt_stop_perf_counter(SNRT_PERF_CNT0);
   snrt_stop_perf_counter(SNRT_PERF_CNT1);
@@ -344,6 +354,11 @@ static int run_case(uint32_t n, uint32_t d, uint32_t case_id) {
 
   if (wait_rc != 0 || smu_error()) {
     PRINTF("SMU error for N=%u D=%u case=%u\n", n, d, case_id);
+    return -1;
+  }
+  if (!saw_busy) {
+    PRINTF("SMU busy was not observed for N=%u D=%u case=%u\n", n, d,
+           case_id);
     return -1;
   }
   if (check_case(n, d) != 0) {
@@ -365,9 +380,15 @@ static int run_stride_zero_case(uint32_t n, uint32_t d, uint32_t case_id) {
   smu_start(buf->m_old, buf->l_old, buf->o_old_packed, buf->m_tile,
             buf->l_tile, buf->o_tile_packed, buf->m_out, buf->l_out,
             buf->o_out_packed, n, d, 0);
-  if (smu_wait() != 0 || smu_error()) {
+  int saw_busy;
+  if (smu_wait_observe_busy(&saw_busy) != 0 || smu_error()) {
     PRINTF("SMU error for stride-zero N=%u D=%u case=%u status=0x%x\n", n, d,
            case_id, smu_status());
+    return -1;
+  }
+  if (!saw_busy) {
+    PRINTF("SMU busy was not observed for stride-zero N=%u D=%u case=%u\n",
+           n, d, case_id);
     return -1;
   }
   if (check_packed_case(n, d) != 0) {
