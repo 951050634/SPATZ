@@ -200,6 +200,9 @@
 - 2026-05-25 benchmark 增加 `run_unsupported_cases()`，覆盖配置合法但当前
   受限 datapath 不支持的 `mixed-m` 和 `unequal-l` cases，要求 engine report
   `MERGE_STATUS.error`。
+- 2026-05-25 benchmark 增加 `run_stride_zero_case()`，使用 packed vector
+  buffers 和 `MERGE_STRIDE=0` 覆盖 RTL 中 `stride==0` 表示 `D * 4` 默认
+  row stride 的路径。
 
 备注：
 
@@ -261,3 +264,10 @@
   下一阶段应保留 simulator stdout 或直接运行目标并归档 `cpu`、`engine`、
   `tcdm_accessed`、`tcdm_congested` 数值。
 - 2026-05-25 新增非法配置测试已经通过 `sw.vlt` 和单项 CTest 验证。
+- 2026-05-25 新增 zero-stride packed-layout benchmark case 后，重新运行
+  `make -C hw/system/spatz_cluster sw.vlt`，软件全量构建完成，命令退出码为
+  0。
+- 2026-05-25 在 `hw/system/spatz_cluster/sw/build` 重新运行
+  `ctest -R online-softmax-merge --output-on-failure`，1/1 测试通过，总耗时
+  116.51 秒，覆盖有效 case、zero-stride packed-layout case、非法配置
+  error-path case 和 unsupported mixed-scalar error-path case。

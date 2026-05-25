@@ -27,6 +27,9 @@ typedef struct {
   float m_out[MAX_N];
   float l_out[MAX_N];
   float o_out[MAX_N][MAX_D];
+  float o_old_packed[MAX_N * MAX_D];
+  float o_tile_packed[MAX_N * MAX_D];
+  float o_out_packed[MAX_N * MAX_D];
   float m_ref[MAX_N];
   float l_ref[MAX_N];
   float o_ref[MAX_N][MAX_D];
@@ -215,6 +218,40 @@ static int check_case(uint32_t n, uint32_t d) {
   return 0;
 }
 
+static void init_packed_vectors(uint32_t n, uint32_t d) {
+  for (uint32_t i = 0; i < n; i++) {
+    for (uint32_t j = 0; j < d; j++) {
+      uint32_t idx = i * d + j;
+      buf->o_old_packed[idx] = buf->o_old[i][j];
+      buf->o_tile_packed[idx] = buf->o_tile[i][j];
+      buf->o_out_packed[idx] = 0.0f;
+    }
+  }
+}
+
+static int check_packed_case(uint32_t n, uint32_t d) {
+  for (uint32_t i = 0; i < n; i++) {
+    if (!fp_close(buf->m_out[i], buf->m_ref[i]) ||
+        !fp_close(buf->l_out[i], buf->l_ref[i])) {
+      PRINTF("Mismatch packed scalar row %u: m got 0x%x ref 0x%x, "
+             "l got 0x%x ref 0x%x\n",
+             i, *(uint32_t *)&buf->m_out[i], *(uint32_t *)&buf->m_ref[i],
+             *(uint32_t *)&buf->l_out[i], *(uint32_t *)&buf->l_ref[i]);
+      return -1;
+    }
+    for (uint32_t j = 0; j < d; j++) {
+      uint32_t idx = i * d + j;
+      if (!fp_close(buf->o_out_packed[idx], buf->o_ref[i][j])) {
+        PRINTF("Mismatch packed O[%u][%u]: got 0x%x ref 0x%x\n", i, j,
+               *(uint32_t *)&buf->o_out_packed[idx],
+               *(uint32_t *)&buf->o_ref[i][j]);
+        return -1;
+      }
+    }
+  }
+  return 0;
+}
+
 static int smu_wait_error(void) {
   const uint32_t max_polls = 1000000u;
   for (uint32_t i = 0; i < max_polls; i++) {
@@ -320,6 +357,29 @@ static int run_case(uint32_t n, uint32_t d, uint32_t case_id) {
   return 0;
 }
 
+static int run_stride_zero_case(uint32_t n, uint32_t d, uint32_t case_id) {
+  init_case(n, d, case_id);
+  init_packed_vectors(n, d);
+  ref_merge(n, d, case_id);
+
+  smu_start(buf->m_old, buf->l_old, buf->o_old_packed, buf->m_tile,
+            buf->l_tile, buf->o_tile_packed, buf->m_out, buf->l_out,
+            buf->o_out_packed, n, d, 0);
+  if (smu_wait() != 0 || smu_error()) {
+    PRINTF("SMU error for stride-zero N=%u D=%u case=%u status=0x%x\n", n, d,
+           case_id, smu_status());
+    return -1;
+  }
+  if (check_packed_case(n, d) != 0) {
+    return -1;
+  }
+
+  PRINTF("online-softmax-merge stride-zero N=%u D=%u case=%u status=0x%x\n", n,
+         d, case_id, smu_status());
+  smu_clear_done();
+  return 0;
+}
+
 int main(void) {
   if (snrt_cluster_core_idx() != 0) {
     snrt_cluster_hw_barrier();
@@ -338,6 +398,7 @@ int main(void) {
   rc |= run_case(16, 64, 2);
   rc |= run_case(4, 8, 3);
   rc |= run_case(4, 8, 4);
+  rc |= run_stride_zero_case(4, 8, 2);
   rc |= run_invalid_cases();
   rc |= run_unsupported_cases();
 
