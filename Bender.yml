@@ -170,6 +170,7 @@ sources:
       # Level 0
       - hw/system/spatz_cluster/src/generated/bootrom.sv
       - hw/system/spatz_cluster/src/spatz_amo_shim.sv
+      - hw/ip/online_merge/src/online_merge_update_engine.sv
       - hw/system/spatz_cluster/src/spatz_cluster_peripheral/spatz_cluster_peripheral_reg_pkg.sv
       - hw/system/spatz_cluster/src/spatz_tcdm_interconnect.sv
       # Level 1

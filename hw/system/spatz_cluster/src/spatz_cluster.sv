@@ -170,7 +170,7 @@ module spatz_cluster
   endfunction
 
   localparam int   unsigned                    NrTCDMPortsCores = get_tcdm_port_offs(NrCores);
-  localparam int   unsigned                    NumTCDMIn        = NrTCDMPortsCores + 1;
+  localparam int   unsigned                    NumTCDMIn        = NrTCDMPortsCores + 2;
   localparam logic          [AxiAddrWidth-1:0] TCDMMask         = ~(TCDMSize-1);
 
   // Core Request, SoC Request
@@ -271,9 +271,9 @@ module spatz_cluster
   // Event counter increments for the TCDM.
   typedef struct packed {
     /// Number requests going in
-    logic [$clog2(NrTCDMPortsCores):0] inc_accessed;
+    logic [$clog2(NumTCDMIn):0] inc_accessed;
     /// Number of requests stalled due to congestion
-    logic [$clog2(NrTCDMPortsCores):0] inc_congested;
+    logic [$clog2(NumTCDMIn):0] inc_congested;
   } tcdm_events_t;
 
   // Event counter increments for DMA.
@@ -396,6 +396,10 @@ module spatz_cluster
   tcdm_req_t axi_soc_req;
   tcdm_rsp_t axi_soc_rsp;
 
+  tcdm_req_t merge_req_raw;
+  tcdm_req_t merge_req;
+  tcdm_rsp_t merge_rsp;
+
   tcdm_req_t [NrTCDMPortsCores-1:0] tcdm_req;
   tcdm_rsp_t [NrTCDMPortsCores-1:0] tcdm_rsp;
 
@@ -419,6 +423,13 @@ module spatz_cluster
   // 7. Misc. Wires.
   logic               icache_prefetch_enable;
   logic [NrCores-1:0] cl_interrupt;
+
+  addr_t merge_src_m_old, merge_src_l_old, merge_src_o_old;
+  addr_t merge_src_m_tile, merge_src_l_tile, merge_src_o_tile;
+  addr_t merge_dst_m, merge_dst_l, merge_dst_o;
+  logic [31:0] merge_n, merge_d, merge_stride;
+  logic merge_start, merge_clear_done;
+  logic merge_busy, merge_done, merge_error;
 
   // -------------
   // DMA Subsystem
@@ -674,10 +685,46 @@ module spatz_cluster
   ) i_tcdm_interconnect (
     .clk_i     (clk_i                  ),
     .rst_ni    (rst_ni                 ),
-    .req_i     ({axi_soc_req, tcdm_req}),
-    .rsp_o     ({axi_soc_rsp, tcdm_rsp}),
+    .req_i     ({axi_soc_req, merge_req, tcdm_req}),
+    .rsp_o     ({axi_soc_rsp, merge_rsp, tcdm_rsp}),
     .mem_req_o (ic_req                 ),
     .mem_rsp_i (ic_rsp                 )
+  );
+
+  always_comb begin
+    merge_req = merge_req_raw;
+    merge_req.q.user.core_id = '0;
+    merge_req.q.user.is_core = 1'b0;
+    merge_req.q.user.req_id = '0;
+  end
+
+  online_merge_update_engine #(
+    .AddrWidth  (TCDMAddrWidth),
+    .DataWidth  (NarrowDataWidth),
+    .tcdm_req_t (tcdm_req_t),
+    .tcdm_rsp_t (tcdm_rsp_t)
+  ) i_online_merge_update_engine (
+    .clk_i              (clk_i),
+    .rst_ni             (rst_ni),
+    .src_m_old_i        (tcdm_addr_t'(merge_src_m_old)),
+    .src_l_old_i        (tcdm_addr_t'(merge_src_l_old)),
+    .src_o_old_i        (tcdm_addr_t'(merge_src_o_old)),
+    .src_m_tile_i       (tcdm_addr_t'(merge_src_m_tile)),
+    .src_l_tile_i       (tcdm_addr_t'(merge_src_l_tile)),
+    .src_o_tile_i       (tcdm_addr_t'(merge_src_o_tile)),
+    .dst_m_i            (tcdm_addr_t'(merge_dst_m)),
+    .dst_l_i            (tcdm_addr_t'(merge_dst_l)),
+    .dst_o_i            (tcdm_addr_t'(merge_dst_o)),
+    .n_i                (merge_n),
+    .d_i                (merge_d),
+    .stride_i           (merge_stride),
+    .start_i            (merge_start),
+    .clear_done_i       (merge_clear_done),
+    .busy_o             (merge_busy),
+    .done_o             (merge_done),
+    .error_o            (merge_error),
+    .tcdm_req_o         (merge_req_raw),
+    .tcdm_rsp_i         (merge_rsp)
   );
 
   hive_req_t [NrCores-1:0] hive_req;
@@ -782,6 +829,7 @@ module spatz_cluster
         tcdm_req[TcdmPortsOffs+j].q              = tcdm_req_wo_user[j].q;
         tcdm_req[TcdmPortsOffs+j].q.user.core_id = i[CoreIDWidth-1:0];
         tcdm_req[TcdmPortsOffs+j].q.user.is_core = 1;
+        tcdm_req[TcdmPortsOffs+j].q.user.req_id  = '0;
         tcdm_req[TcdmPortsOffs+j].q_valid        = tcdm_req_wo_user[j].q_valid;
       end
     end
@@ -1028,6 +1076,23 @@ module spatz_cluster
     .tcdm_end_address_i       (tcdm_end_address      ),
     .icache_prefetch_enable_o (icache_prefetch_enable),
     .cl_clint_o               (cl_interrupt          ),
+    .merge_src_m_old_o        (merge_src_m_old       ),
+    .merge_src_l_old_o        (merge_src_l_old       ),
+    .merge_src_o_old_o        (merge_src_o_old       ),
+    .merge_src_m_tile_o       (merge_src_m_tile      ),
+    .merge_src_l_tile_o       (merge_src_l_tile      ),
+    .merge_src_o_tile_o       (merge_src_o_tile      ),
+    .merge_dst_m_o            (merge_dst_m           ),
+    .merge_dst_l_o            (merge_dst_l           ),
+    .merge_dst_o_o            (merge_dst_o           ),
+    .merge_n_o                (merge_n               ),
+    .merge_d_o                (merge_d               ),
+    .merge_stride_o           (merge_stride          ),
+    .merge_start_o            (merge_start           ),
+    .merge_clear_done_o       (merge_clear_done      ),
+    .merge_busy_i             (merge_busy            ),
+    .merge_done_i             (merge_done            ),
+    .merge_error_i            (merge_error           ),
     .cluster_hart_base_id_i   (hart_base_id_i        ),
     .core_events_i            (core_events           ),
     .tcdm_events_i            (tcdm_events           ),
@@ -1126,21 +1191,27 @@ module spatz_cluster
   // --------------------
   // TCDM event counters
   // --------------------
-  logic [NrTCDMPortsCores-1:0] flat_acc, flat_con;
-  for (genvar i = 0; i < NrTCDMPortsCores; i++) begin : gen_event_counter
-    `FFARN(flat_acc[i], tcdm_req[i].q_valid, '0, clk_i, rst_ni)
-    `FFARN(flat_con[i], tcdm_req[i].q_valid & ~tcdm_rsp[i].q_ready, '0, clk_i, rst_ni)
+  tcdm_req_t [NumTCDMIn-1:0] tcdm_event_req;
+  tcdm_rsp_t [NumTCDMIn-1:0] tcdm_event_rsp;
+  logic [NumTCDMIn-1:0] flat_acc, flat_con;
+
+  assign tcdm_event_req = {axi_soc_req, merge_req, tcdm_req};
+  assign tcdm_event_rsp = {axi_soc_rsp, merge_rsp, tcdm_rsp};
+
+  for (genvar i = 0; i < NumTCDMIn; i++) begin : gen_event_counter
+    `FFARN(flat_acc[i], tcdm_event_req[i].q_valid, '0, clk_i, rst_ni)
+    `FFARN(flat_con[i], tcdm_event_req[i].q_valid & ~tcdm_event_rsp[i].q_ready, '0, clk_i, rst_ni)
   end
 
   popcount #(
-    .INPUT_WIDTH ( NrTCDMPortsCores )
+    .INPUT_WIDTH ( NumTCDMIn )
   ) i_popcount_req (
     .data_i     ( flat_acc                 ),
     .popcount_o ( tcdm_events.inc_accessed )
   );
 
   popcount #(
-    .INPUT_WIDTH ( NrTCDMPortsCores )
+    .INPUT_WIDTH ( NumTCDMIn )
   ) i_popcount_con (
     .data_i     ( flat_con                  ),
     .popcount_o ( tcdm_events.inc_congested )

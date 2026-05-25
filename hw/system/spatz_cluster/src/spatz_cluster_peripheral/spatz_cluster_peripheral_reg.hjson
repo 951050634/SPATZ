@@ -438,6 +438,142 @@
 	    name: "EOC_EXIT",
 	    desc: "Indicates the end of computation and exit status."
 	}]
-     }
+     },
+    {
+	name: "MERGE_SRC_M_OLD",
+	desc: '''TCDM byte offset of the old per-row max state buffer.'''
+	swaccess: "rw",
+	hwaccess: "hro",
+	resval: "0",
+	fields: [{ bits: "31:0", name: "ADDR", desc: "Cluster-local TCDM byte offset." }]
+    },
+    {
+	name: "MERGE_SRC_L_OLD",
+	desc: '''TCDM byte offset of the old per-row normalization state buffer.'''
+	swaccess: "rw",
+	hwaccess: "hro",
+	resval: "0",
+	fields: [{ bits: "31:0", name: "ADDR", desc: "Cluster-local TCDM byte offset." }]
+    },
+    {
+	name: "MERGE_SRC_O_OLD",
+	desc: '''TCDM byte offset of the old O matrix buffer.'''
+	swaccess: "rw",
+	hwaccess: "hro",
+	resval: "0",
+	fields: [{ bits: "31:0", name: "ADDR", desc: "Cluster-local TCDM byte offset." }]
+    },
+    {
+	name: "MERGE_SRC_M_TILE",
+	desc: '''TCDM byte offset of the tile per-row max state buffer.'''
+	swaccess: "rw",
+	hwaccess: "hro",
+	resval: "0",
+	fields: [{ bits: "31:0", name: "ADDR", desc: "Cluster-local TCDM byte offset." }]
+    },
+    {
+	name: "MERGE_SRC_L_TILE",
+	desc: '''TCDM byte offset of the tile per-row normalization state buffer.'''
+	swaccess: "rw",
+	hwaccess: "hro",
+	resval: "0",
+	fields: [{ bits: "31:0", name: "ADDR", desc: "Cluster-local TCDM byte offset." }]
+    },
+    {
+	name: "MERGE_SRC_O_TILE",
+	desc: '''TCDM byte offset of the tile O matrix buffer.'''
+	swaccess: "rw",
+	hwaccess: "hro",
+	resval: "0",
+	fields: [{ bits: "31:0", name: "ADDR", desc: "Cluster-local TCDM byte offset." }]
+    },
+    {
+	name: "MERGE_DST_M",
+	desc: '''TCDM byte offset of the output per-row max state buffer.'''
+	swaccess: "rw",
+	hwaccess: "hro",
+	resval: "0",
+	fields: [{ bits: "31:0", name: "ADDR", desc: "Cluster-local TCDM byte offset." }]
+    },
+    {
+	name: "MERGE_DST_L",
+	desc: '''TCDM byte offset of the output per-row normalization state buffer.'''
+	swaccess: "rw",
+	hwaccess: "hro",
+	resval: "0",
+	fields: [{ bits: "31:0", name: "ADDR", desc: "Cluster-local TCDM byte offset." }]
+    },
+    {
+	name: "MERGE_DST_O",
+	desc: '''TCDM byte offset of the output O matrix buffer.'''
+	swaccess: "rw",
+	hwaccess: "hro",
+	resval: "0",
+	fields: [{ bits: "31:0", name: "ADDR", desc: "Cluster-local TCDM byte offset." }]
+    },
+    {
+	name: "MERGE_N",
+	desc: '''Number of rows to merge.'''
+	swaccess: "rw",
+	hwaccess: "hro",
+	resval: "0",
+	fields: [{ bits: "31:0", name: "VALUE", desc: "Number of rows." }]
+    },
+    {
+	name: "MERGE_D",
+	desc: '''Number of FP32 O elements per row.'''
+	swaccess: "rw",
+	hwaccess: "hro",
+	resval: "0",
+	fields: [{ bits: "31:0", name: "VALUE", desc: "Number of columns." }]
+    },
+    {
+	name: "MERGE_STRIDE",
+	desc: '''Byte stride between adjacent O rows. A zero value means D * 4 bytes.'''
+	swaccess: "rw",
+	hwaccess: "hro",
+	resval: "0",
+	fields: [{ bits: "31:0", name: "VALUE", desc: "O row stride in bytes." }]
+    },
+    {
+	name: "MERGE_CTRL",
+	desc: '''Control pulses for the online softmax merge engine.'''
+	swaccess: "wo",
+	hwaccess: "hro",
+	hwext: "true",
+	hwqe: "true",
+	fields: [{
+	    bits: "0:0",
+	    name: "START",
+	    desc: "Write 1 to start the engine."
+	},
+	{
+	    bits: "1:1",
+	    name: "CLEAR_DONE",
+	    desc: "Write 1 to clear done and error status."
+	}]
+    },
+    {
+	name: "MERGE_STATUS",
+	desc: '''Status reported by the online softmax merge engine.'''
+	swaccess: "ro",
+	hwaccess: "hrw",
+	hwext: "true",
+	fields: [{
+	    bits: "0:0",
+	    name: "BUSY",
+	    desc: "The engine is executing a merge request."
+	},
+	{
+	    bits: "1:1",
+	    name: "DONE",
+	    desc: "The previous merge request completed."
+	},
+	{
+	    bits: "2:2",
+	    name: "ERROR",
+	    desc: "The previous request failed configuration validation."
+	}]
+    }
   ]
 }

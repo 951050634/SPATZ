@@ -10,7 +10,7 @@
 module spatz_cluster_peripheral_reg_top #(
   parameter type reg_req_t = logic,
   parameter type reg_rsp_t = logic,
-  parameter int AW = 7
+  parameter int AW = 8
 ) (
   input logic clk_i,
   input logic rst_ni,
@@ -284,6 +284,52 @@ module spatz_cluster_peripheral_reg_top #(
   logic [31:0] cluster_eoc_exit_qs;
   logic [31:0] cluster_eoc_exit_wd;
   logic cluster_eoc_exit_we;
+  logic [31:0] merge_src_m_old_qs;
+  logic [31:0] merge_src_m_old_wd;
+  logic merge_src_m_old_we;
+  logic [31:0] merge_src_l_old_qs;
+  logic [31:0] merge_src_l_old_wd;
+  logic merge_src_l_old_we;
+  logic [31:0] merge_src_o_old_qs;
+  logic [31:0] merge_src_o_old_wd;
+  logic merge_src_o_old_we;
+  logic [31:0] merge_src_m_tile_qs;
+  logic [31:0] merge_src_m_tile_wd;
+  logic merge_src_m_tile_we;
+  logic [31:0] merge_src_l_tile_qs;
+  logic [31:0] merge_src_l_tile_wd;
+  logic merge_src_l_tile_we;
+  logic [31:0] merge_src_o_tile_qs;
+  logic [31:0] merge_src_o_tile_wd;
+  logic merge_src_o_tile_we;
+  logic [31:0] merge_dst_m_qs;
+  logic [31:0] merge_dst_m_wd;
+  logic merge_dst_m_we;
+  logic [31:0] merge_dst_l_qs;
+  logic [31:0] merge_dst_l_wd;
+  logic merge_dst_l_we;
+  logic [31:0] merge_dst_o_qs;
+  logic [31:0] merge_dst_o_wd;
+  logic merge_dst_o_we;
+  logic [31:0] merge_n_qs;
+  logic [31:0] merge_n_wd;
+  logic merge_n_we;
+  logic [31:0] merge_d_qs;
+  logic [31:0] merge_d_wd;
+  logic merge_d_we;
+  logic [31:0] merge_stride_qs;
+  logic [31:0] merge_stride_wd;
+  logic merge_stride_we;
+  logic merge_ctrl_start_wd;
+  logic merge_ctrl_start_we;
+  logic merge_ctrl_clear_done_wd;
+  logic merge_ctrl_clear_done_we;
+  logic merge_status_busy_qs;
+  logic merge_status_busy_re;
+  logic merge_status_done_qs;
+  logic merge_status_done_re;
+  logic merge_status_error_qs;
+  logic merge_status_error_re;
 
   // Register instances
 
@@ -2150,9 +2196,412 @@ module spatz_cluster_peripheral_reg_top #(
   );
 
 
+  // R[merge_src_m_old]: V(False)
+
+  prim_subreg #(
+    .DW      (32),
+    .SWACCESS("RW"),
+    .RESVAL  (32'h0)
+  ) u_merge_src_m_old (
+    .clk_i   (clk_i    ),
+    .rst_ni  (rst_ni  ),
+
+    // from register interface
+    .we     (merge_src_m_old_we),
+    .wd     (merge_src_m_old_wd),
+
+    // from internal hardware
+    .de     (1'b0),
+    .d      ('0  ),
+
+    // to internal hardware
+    .qe     (),
+    .q      (reg2hw.merge_src_m_old.q ),
+
+    // to register interface (read)
+    .qs     (merge_src_m_old_qs)
+  );
 
 
-  logic [12:0] addr_hit;
+  // R[merge_src_l_old]: V(False)
+
+  prim_subreg #(
+    .DW      (32),
+    .SWACCESS("RW"),
+    .RESVAL  (32'h0)
+  ) u_merge_src_l_old (
+    .clk_i   (clk_i    ),
+    .rst_ni  (rst_ni  ),
+
+    // from register interface
+    .we     (merge_src_l_old_we),
+    .wd     (merge_src_l_old_wd),
+
+    // from internal hardware
+    .de     (1'b0),
+    .d      ('0  ),
+
+    // to internal hardware
+    .qe     (),
+    .q      (reg2hw.merge_src_l_old.q ),
+
+    // to register interface (read)
+    .qs     (merge_src_l_old_qs)
+  );
+
+
+  // R[merge_src_o_old]: V(False)
+
+  prim_subreg #(
+    .DW      (32),
+    .SWACCESS("RW"),
+    .RESVAL  (32'h0)
+  ) u_merge_src_o_old (
+    .clk_i   (clk_i    ),
+    .rst_ni  (rst_ni  ),
+
+    // from register interface
+    .we     (merge_src_o_old_we),
+    .wd     (merge_src_o_old_wd),
+
+    // from internal hardware
+    .de     (1'b0),
+    .d      ('0  ),
+
+    // to internal hardware
+    .qe     (),
+    .q      (reg2hw.merge_src_o_old.q ),
+
+    // to register interface (read)
+    .qs     (merge_src_o_old_qs)
+  );
+
+
+  // R[merge_src_m_tile]: V(False)
+
+  prim_subreg #(
+    .DW      (32),
+    .SWACCESS("RW"),
+    .RESVAL  (32'h0)
+  ) u_merge_src_m_tile (
+    .clk_i   (clk_i    ),
+    .rst_ni  (rst_ni  ),
+
+    // from register interface
+    .we     (merge_src_m_tile_we),
+    .wd     (merge_src_m_tile_wd),
+
+    // from internal hardware
+    .de     (1'b0),
+    .d      ('0  ),
+
+    // to internal hardware
+    .qe     (),
+    .q      (reg2hw.merge_src_m_tile.q ),
+
+    // to register interface (read)
+    .qs     (merge_src_m_tile_qs)
+  );
+
+
+  // R[merge_src_l_tile]: V(False)
+
+  prim_subreg #(
+    .DW      (32),
+    .SWACCESS("RW"),
+    .RESVAL  (32'h0)
+  ) u_merge_src_l_tile (
+    .clk_i   (clk_i    ),
+    .rst_ni  (rst_ni  ),
+
+    // from register interface
+    .we     (merge_src_l_tile_we),
+    .wd     (merge_src_l_tile_wd),
+
+    // from internal hardware
+    .de     (1'b0),
+    .d      ('0  ),
+
+    // to internal hardware
+    .qe     (),
+    .q      (reg2hw.merge_src_l_tile.q ),
+
+    // to register interface (read)
+    .qs     (merge_src_l_tile_qs)
+  );
+
+
+  // R[merge_src_o_tile]: V(False)
+
+  prim_subreg #(
+    .DW      (32),
+    .SWACCESS("RW"),
+    .RESVAL  (32'h0)
+  ) u_merge_src_o_tile (
+    .clk_i   (clk_i    ),
+    .rst_ni  (rst_ni  ),
+
+    // from register interface
+    .we     (merge_src_o_tile_we),
+    .wd     (merge_src_o_tile_wd),
+
+    // from internal hardware
+    .de     (1'b0),
+    .d      ('0  ),
+
+    // to internal hardware
+    .qe     (),
+    .q      (reg2hw.merge_src_o_tile.q ),
+
+    // to register interface (read)
+    .qs     (merge_src_o_tile_qs)
+  );
+
+
+  // R[merge_dst_m]: V(False)
+
+  prim_subreg #(
+    .DW      (32),
+    .SWACCESS("RW"),
+    .RESVAL  (32'h0)
+  ) u_merge_dst_m (
+    .clk_i   (clk_i    ),
+    .rst_ni  (rst_ni  ),
+
+    // from register interface
+    .we     (merge_dst_m_we),
+    .wd     (merge_dst_m_wd),
+
+    // from internal hardware
+    .de     (1'b0),
+    .d      ('0  ),
+
+    // to internal hardware
+    .qe     (),
+    .q      (reg2hw.merge_dst_m.q ),
+
+    // to register interface (read)
+    .qs     (merge_dst_m_qs)
+  );
+
+
+  // R[merge_dst_l]: V(False)
+
+  prim_subreg #(
+    .DW      (32),
+    .SWACCESS("RW"),
+    .RESVAL  (32'h0)
+  ) u_merge_dst_l (
+    .clk_i   (clk_i    ),
+    .rst_ni  (rst_ni  ),
+
+    // from register interface
+    .we     (merge_dst_l_we),
+    .wd     (merge_dst_l_wd),
+
+    // from internal hardware
+    .de     (1'b0),
+    .d      ('0  ),
+
+    // to internal hardware
+    .qe     (),
+    .q      (reg2hw.merge_dst_l.q ),
+
+    // to register interface (read)
+    .qs     (merge_dst_l_qs)
+  );
+
+
+  // R[merge_dst_o]: V(False)
+
+  prim_subreg #(
+    .DW      (32),
+    .SWACCESS("RW"),
+    .RESVAL  (32'h0)
+  ) u_merge_dst_o (
+    .clk_i   (clk_i    ),
+    .rst_ni  (rst_ni  ),
+
+    // from register interface
+    .we     (merge_dst_o_we),
+    .wd     (merge_dst_o_wd),
+
+    // from internal hardware
+    .de     (1'b0),
+    .d      ('0  ),
+
+    // to internal hardware
+    .qe     (),
+    .q      (reg2hw.merge_dst_o.q ),
+
+    // to register interface (read)
+    .qs     (merge_dst_o_qs)
+  );
+
+
+  // R[merge_n]: V(False)
+
+  prim_subreg #(
+    .DW      (32),
+    .SWACCESS("RW"),
+    .RESVAL  (32'h0)
+  ) u_merge_n (
+    .clk_i   (clk_i    ),
+    .rst_ni  (rst_ni  ),
+
+    // from register interface
+    .we     (merge_n_we),
+    .wd     (merge_n_wd),
+
+    // from internal hardware
+    .de     (1'b0),
+    .d      ('0  ),
+
+    // to internal hardware
+    .qe     (),
+    .q      (reg2hw.merge_n.q ),
+
+    // to register interface (read)
+    .qs     (merge_n_qs)
+  );
+
+
+  // R[merge_d]: V(False)
+
+  prim_subreg #(
+    .DW      (32),
+    .SWACCESS("RW"),
+    .RESVAL  (32'h0)
+  ) u_merge_d (
+    .clk_i   (clk_i    ),
+    .rst_ni  (rst_ni  ),
+
+    // from register interface
+    .we     (merge_d_we),
+    .wd     (merge_d_wd),
+
+    // from internal hardware
+    .de     (1'b0),
+    .d      ('0  ),
+
+    // to internal hardware
+    .qe     (),
+    .q      (reg2hw.merge_d.q ),
+
+    // to register interface (read)
+    .qs     (merge_d_qs)
+  );
+
+
+  // R[merge_stride]: V(False)
+
+  prim_subreg #(
+    .DW      (32),
+    .SWACCESS("RW"),
+    .RESVAL  (32'h0)
+  ) u_merge_stride (
+    .clk_i   (clk_i    ),
+    .rst_ni  (rst_ni  ),
+
+    // from register interface
+    .we     (merge_stride_we),
+    .wd     (merge_stride_wd),
+
+    // from internal hardware
+    .de     (1'b0),
+    .d      ('0  ),
+
+    // to internal hardware
+    .qe     (),
+    .q      (reg2hw.merge_stride.q ),
+
+    // to register interface (read)
+    .qs     (merge_stride_qs)
+  );
+
+
+  // R[merge_ctrl]: V(True)
+
+  //   F[start]: 0:0
+  prim_subreg_ext #(
+    .DW    (1)
+  ) u_merge_ctrl_start (
+    .re     (1'b0),
+    .we     (merge_ctrl_start_we),
+    .wd     (merge_ctrl_start_wd),
+    .d      ('0),
+    .qre    (),
+    .qe     (reg2hw.merge_ctrl.start.qe),
+    .q      (reg2hw.merge_ctrl.start.q ),
+    .qs     ()
+  );
+
+
+  //   F[clear_done]: 1:1
+  prim_subreg_ext #(
+    .DW    (1)
+  ) u_merge_ctrl_clear_done (
+    .re     (1'b0),
+    .we     (merge_ctrl_clear_done_we),
+    .wd     (merge_ctrl_clear_done_wd),
+    .d      ('0),
+    .qre    (),
+    .qe     (reg2hw.merge_ctrl.clear_done.qe),
+    .q      (reg2hw.merge_ctrl.clear_done.q ),
+    .qs     ()
+  );
+
+
+  // R[merge_status]: V(True)
+
+  //   F[busy]: 0:0
+  prim_subreg_ext #(
+    .DW    (1)
+  ) u_merge_status_busy (
+    .re     (merge_status_busy_re),
+    .we     (1'b0),
+    .wd     ('0),
+    .d      (hw2reg.merge_status.busy.d),
+    .qre    (),
+    .qe     (),
+    .q      (reg2hw.merge_status.busy.q ),
+    .qs     (merge_status_busy_qs)
+  );
+
+
+  //   F[done]: 1:1
+  prim_subreg_ext #(
+    .DW    (1)
+  ) u_merge_status_done (
+    .re     (merge_status_done_re),
+    .we     (1'b0),
+    .wd     ('0),
+    .d      (hw2reg.merge_status.done.d),
+    .qre    (),
+    .qe     (),
+    .q      (reg2hw.merge_status.done.q ),
+    .qs     (merge_status_done_qs)
+  );
+
+
+  //   F[error]: 2:2
+  prim_subreg_ext #(
+    .DW    (1)
+  ) u_merge_status_error (
+    .re     (merge_status_error_re),
+    .we     (1'b0),
+    .wd     ('0),
+    .d      (hw2reg.merge_status.error.d),
+    .qre    (),
+    .qe     (),
+    .q      (reg2hw.merge_status.error.q ),
+    .qs     (merge_status_error_qs)
+  );
+
+
+
+
+  logic [26:0] addr_hit;
   always_comb begin
     addr_hit = '0;
     addr_hit[ 0] = (reg_addr == SPATZ_CLUSTER_PERIPHERAL_PERF_COUNTER_ENABLE_0_OFFSET);
@@ -2168,6 +2617,20 @@ module spatz_cluster_peripheral_reg_top #(
     addr_hit[10] = (reg_addr == SPATZ_CLUSTER_PERIPHERAL_SPATZ_STATUS_OFFSET);
     addr_hit[11] = (reg_addr == SPATZ_CLUSTER_PERIPHERAL_CLUSTER_BOOT_CONTROL_OFFSET);
     addr_hit[12] = (reg_addr == SPATZ_CLUSTER_PERIPHERAL_CLUSTER_EOC_EXIT_OFFSET);
+    addr_hit[13] = (reg_addr == SPATZ_CLUSTER_PERIPHERAL_MERGE_SRC_M_OLD_OFFSET);
+    addr_hit[14] = (reg_addr == SPATZ_CLUSTER_PERIPHERAL_MERGE_SRC_L_OLD_OFFSET);
+    addr_hit[15] = (reg_addr == SPATZ_CLUSTER_PERIPHERAL_MERGE_SRC_O_OLD_OFFSET);
+    addr_hit[16] = (reg_addr == SPATZ_CLUSTER_PERIPHERAL_MERGE_SRC_M_TILE_OFFSET);
+    addr_hit[17] = (reg_addr == SPATZ_CLUSTER_PERIPHERAL_MERGE_SRC_L_TILE_OFFSET);
+    addr_hit[18] = (reg_addr == SPATZ_CLUSTER_PERIPHERAL_MERGE_SRC_O_TILE_OFFSET);
+    addr_hit[19] = (reg_addr == SPATZ_CLUSTER_PERIPHERAL_MERGE_DST_M_OFFSET);
+    addr_hit[20] = (reg_addr == SPATZ_CLUSTER_PERIPHERAL_MERGE_DST_L_OFFSET);
+    addr_hit[21] = (reg_addr == SPATZ_CLUSTER_PERIPHERAL_MERGE_DST_O_OFFSET);
+    addr_hit[22] = (reg_addr == SPATZ_CLUSTER_PERIPHERAL_MERGE_N_OFFSET);
+    addr_hit[23] = (reg_addr == SPATZ_CLUSTER_PERIPHERAL_MERGE_D_OFFSET);
+    addr_hit[24] = (reg_addr == SPATZ_CLUSTER_PERIPHERAL_MERGE_STRIDE_OFFSET);
+    addr_hit[25] = (reg_addr == SPATZ_CLUSTER_PERIPHERAL_MERGE_CTRL_OFFSET);
+    addr_hit[26] = (reg_addr == SPATZ_CLUSTER_PERIPHERAL_MERGE_STATUS_OFFSET);
   end
 
   assign addrmiss = (reg_re || reg_we) ? ~|addr_hit : 1'b0 ;
@@ -2187,7 +2650,21 @@ module spatz_cluster_peripheral_reg_top #(
                (addr_hit[ 9] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[ 9] & ~reg_be))) |
                (addr_hit[10] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[10] & ~reg_be))) |
                (addr_hit[11] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[11] & ~reg_be))) |
-               (addr_hit[12] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[12] & ~reg_be)))));
+               (addr_hit[12] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[12] & ~reg_be))) |
+               (addr_hit[13] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[13] & ~reg_be))) |
+               (addr_hit[14] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[14] & ~reg_be))) |
+               (addr_hit[15] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[15] & ~reg_be))) |
+               (addr_hit[16] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[16] & ~reg_be))) |
+               (addr_hit[17] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[17] & ~reg_be))) |
+               (addr_hit[18] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[18] & ~reg_be))) |
+               (addr_hit[19] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[19] & ~reg_be))) |
+               (addr_hit[20] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[20] & ~reg_be))) |
+               (addr_hit[21] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[21] & ~reg_be))) |
+               (addr_hit[22] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[22] & ~reg_be))) |
+               (addr_hit[23] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[23] & ~reg_be))) |
+               (addr_hit[24] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[24] & ~reg_be))) |
+               (addr_hit[25] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[25] & ~reg_be))) |
+               (addr_hit[26] & (|(SPATZ_CLUSTER_PERIPHERAL_PERMIT[26] & ~reg_be)))));
   end
 
   assign perf_counter_enable_0_cycle_0_we = addr_hit[0] & reg_we & !reg_error;
@@ -2410,6 +2887,54 @@ module spatz_cluster_peripheral_reg_top #(
   assign cluster_eoc_exit_we = addr_hit[12] & reg_we & !reg_error;
   assign cluster_eoc_exit_wd = reg_wdata[31:0];
 
+  assign merge_src_m_old_we = addr_hit[13] & reg_we & !reg_error;
+  assign merge_src_m_old_wd = reg_wdata[31:0];
+
+  assign merge_src_l_old_we = addr_hit[14] & reg_we & !reg_error;
+  assign merge_src_l_old_wd = reg_wdata[31:0];
+
+  assign merge_src_o_old_we = addr_hit[15] & reg_we & !reg_error;
+  assign merge_src_o_old_wd = reg_wdata[31:0];
+
+  assign merge_src_m_tile_we = addr_hit[16] & reg_we & !reg_error;
+  assign merge_src_m_tile_wd = reg_wdata[31:0];
+
+  assign merge_src_l_tile_we = addr_hit[17] & reg_we & !reg_error;
+  assign merge_src_l_tile_wd = reg_wdata[31:0];
+
+  assign merge_src_o_tile_we = addr_hit[18] & reg_we & !reg_error;
+  assign merge_src_o_tile_wd = reg_wdata[31:0];
+
+  assign merge_dst_m_we = addr_hit[19] & reg_we & !reg_error;
+  assign merge_dst_m_wd = reg_wdata[31:0];
+
+  assign merge_dst_l_we = addr_hit[20] & reg_we & !reg_error;
+  assign merge_dst_l_wd = reg_wdata[31:0];
+
+  assign merge_dst_o_we = addr_hit[21] & reg_we & !reg_error;
+  assign merge_dst_o_wd = reg_wdata[31:0];
+
+  assign merge_n_we = addr_hit[22] & reg_we & !reg_error;
+  assign merge_n_wd = reg_wdata[31:0];
+
+  assign merge_d_we = addr_hit[23] & reg_we & !reg_error;
+  assign merge_d_wd = reg_wdata[31:0];
+
+  assign merge_stride_we = addr_hit[24] & reg_we & !reg_error;
+  assign merge_stride_wd = reg_wdata[31:0];
+
+  assign merge_ctrl_start_we = addr_hit[25] & reg_we & !reg_error;
+  assign merge_ctrl_start_wd = reg_wdata[0];
+
+  assign merge_ctrl_clear_done_we = addr_hit[25] & reg_we & !reg_error;
+  assign merge_ctrl_clear_done_wd = reg_wdata[1];
+
+  assign merge_status_busy_re = addr_hit[26] & reg_re & !reg_error;
+
+  assign merge_status_done_re = addr_hit[26] & reg_re & !reg_error;
+
+  assign merge_status_error_re = addr_hit[26] & reg_re & !reg_error;
+
   // Read data return
   always_comb begin
     reg_rdata_next = '0;
@@ -2526,6 +3051,65 @@ module spatz_cluster_peripheral_reg_top #(
         reg_rdata_next[31:0] = cluster_eoc_exit_qs;
       end
 
+      addr_hit[13]: begin
+        reg_rdata_next[31:0] = merge_src_m_old_qs;
+      end
+
+      addr_hit[14]: begin
+        reg_rdata_next[31:0] = merge_src_l_old_qs;
+      end
+
+      addr_hit[15]: begin
+        reg_rdata_next[31:0] = merge_src_o_old_qs;
+      end
+
+      addr_hit[16]: begin
+        reg_rdata_next[31:0] = merge_src_m_tile_qs;
+      end
+
+      addr_hit[17]: begin
+        reg_rdata_next[31:0] = merge_src_l_tile_qs;
+      end
+
+      addr_hit[18]: begin
+        reg_rdata_next[31:0] = merge_src_o_tile_qs;
+      end
+
+      addr_hit[19]: begin
+        reg_rdata_next[31:0] = merge_dst_m_qs;
+      end
+
+      addr_hit[20]: begin
+        reg_rdata_next[31:0] = merge_dst_l_qs;
+      end
+
+      addr_hit[21]: begin
+        reg_rdata_next[31:0] = merge_dst_o_qs;
+      end
+
+      addr_hit[22]: begin
+        reg_rdata_next[31:0] = merge_n_qs;
+      end
+
+      addr_hit[23]: begin
+        reg_rdata_next[31:0] = merge_d_qs;
+      end
+
+      addr_hit[24]: begin
+        reg_rdata_next[31:0] = merge_stride_qs;
+      end
+
+      addr_hit[25]: begin
+        reg_rdata_next[0] = '0;
+        reg_rdata_next[1] = '0;
+      end
+
+      addr_hit[26]: begin
+        reg_rdata_next[0] = merge_status_busy_qs;
+        reg_rdata_next[1] = merge_status_done_qs;
+        reg_rdata_next[2] = merge_status_error_qs;
+      end
+
       default: begin
         reg_rdata_next = '1;
       end
@@ -2548,7 +3132,7 @@ endmodule
 
 module spatz_cluster_peripheral_reg_top_intf
 #(
-  parameter int AW = 7,
+  parameter int AW = 8,
   localparam int DW = 64
 ) (
   input logic clk_i,

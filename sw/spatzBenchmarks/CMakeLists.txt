@@ -88,6 +88,9 @@ add_library(sp-fft sp-fft/kernel/fft.c)
 enable_testing()
 set(SNITCH_TEST_PREFIX spatzBenchmarks-)
 
+add_snitch_test(online-softmax-merge online-softmax-merge/main.c)
+target_link_libraries(test-${SNITCH_TEST_PREFIX}online-softmax-merge benchmark ${SNITCH_RUNTIME})
+
 add_spatz_test_threeParam(dp-fmatmul dp-fmatmul/main.c 64  64  64 )
 add_spatz_test_threeParam(dp-fmatmul dp-fmatmul/main.c 64  128 64 )
 add_spatz_test_threeParam(dp-fmatmul dp-fmatmul/main.c 128 128 128)

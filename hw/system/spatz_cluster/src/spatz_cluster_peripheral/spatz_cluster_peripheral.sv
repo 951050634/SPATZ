@@ -32,6 +32,23 @@ module spatz_cluster_peripheral
   output logic                       icache_prefetch_enable_o,
   output logic [NrCores-1:0]         cl_clint_o,
   output logic                       cluster_probe_o,
+  output addr_t                      merge_src_m_old_o,
+  output addr_t                      merge_src_l_old_o,
+  output addr_t                      merge_src_o_old_o,
+  output addr_t                      merge_src_m_tile_o,
+  output addr_t                      merge_src_l_tile_o,
+  output addr_t                      merge_src_o_tile_o,
+  output addr_t                      merge_dst_m_o,
+  output addr_t                      merge_dst_l_o,
+  output addr_t                      merge_dst_o_o,
+  output logic [31:0]                merge_n_o,
+  output logic [31:0]                merge_d_o,
+  output logic [31:0]                merge_stride_o,
+  output logic                       merge_start_o,
+  output logic                       merge_clear_done_o,
+  input  logic                       merge_busy_i,
+  input  logic                       merge_done_i,
+  input  logic                       merge_error_i,
   input  logic [9:0]                 cluster_hart_base_id_i,
   input  core_events_t [NrCores-1:0] core_events_i,
   input  tcdm_events_t               tcdm_events_i,
@@ -84,6 +101,25 @@ module spatz_cluster_peripheral
 
   // Probe
   assign cluster_probe_o = reg2hw.spatz_status.q;
+
+  // Online softmax merge-update engine configuration and status.
+  assign merge_src_m_old_o   = addr_t'(reg2hw.merge_src_m_old.q);
+  assign merge_src_l_old_o   = addr_t'(reg2hw.merge_src_l_old.q);
+  assign merge_src_o_old_o   = addr_t'(reg2hw.merge_src_o_old.q);
+  assign merge_src_m_tile_o  = addr_t'(reg2hw.merge_src_m_tile.q);
+  assign merge_src_l_tile_o  = addr_t'(reg2hw.merge_src_l_tile.q);
+  assign merge_src_o_tile_o  = addr_t'(reg2hw.merge_src_o_tile.q);
+  assign merge_dst_m_o       = addr_t'(reg2hw.merge_dst_m.q);
+  assign merge_dst_l_o       = addr_t'(reg2hw.merge_dst_l.q);
+  assign merge_dst_o_o       = addr_t'(reg2hw.merge_dst_o.q);
+  assign merge_n_o           = reg2hw.merge_n.q;
+  assign merge_d_o           = reg2hw.merge_d.q;
+  assign merge_stride_o      = reg2hw.merge_stride.q;
+  assign merge_start_o       = reg2hw.merge_ctrl.start.qe & reg2hw.merge_ctrl.start.q;
+  assign merge_clear_done_o  = reg2hw.merge_ctrl.clear_done.qe & reg2hw.merge_ctrl.clear_done.q;
+  assign hw2reg.merge_status.busy.d  = merge_busy_i;
+  assign hw2reg.merge_status.done.d  = merge_done_i;
+  assign hw2reg.merge_status.error.d = merge_error_i;
 
   // Continuously assign the perf values.
   for (genvar i = 0; i < NumPerfCounters; i++) begin : gen_perf_assign
