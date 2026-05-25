@@ -5,27 +5,14 @@
 #pragma once
 
 #include "snrt.h"
+#include "spatz_cluster_peripheral.h"
 
 /// Different perf counters
 // Must match with `spatz_cluster_peripheral`
 enum snrt_perf_cnt {
     SNRT_PERF_CNT0,
     SNRT_PERF_CNT1,
-    SNRT_PERF_CNT2,
-    SNRT_PERF_CNT3,
-    SNRT_PERF_CNT4,
-    SNRT_PERF_CNT5,
-    SNRT_PERF_CNT6,
-    SNRT_PERF_CNT7,
-    SNRT_PERF_CNT8,
-    SNRT_PERF_CNT9,
-    SNRT_PERF_CNT10,
-    SNRT_PERF_CNT11,
-    SNRT_PERF_CNT12,
-    SNRT_PERF_CNT13,
-    SNRT_PERF_CNT14,
-    SNRT_PERF_CNT15,
-    SNRT_PERF_N_CNT,
+    SNRT_PERF_N_CNT = SPATZ_CLUSTER_PERIPHERAL_PARAM_NUM_PERF_COUNTERS,
 };
 
 /// Different types of performance counters

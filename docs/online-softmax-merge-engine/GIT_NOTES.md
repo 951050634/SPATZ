@@ -282,3 +282,48 @@ N=16, D=64, case=2: cpu=23017, engine=9629, tcdm_accessed=0, tcdm_congested=0。
 ```text
 暂无。
 ```
+
+## 2026-05-25 Perf-counter runtime layout 记录
+
+本轮计划提交：
+
+```text
+[smu] Fix runtime perf counter layout
+```
+
+范围：
+
+```text
+M  docs/online-softmax-merge-engine/PHASE_RESULTS.md
+M  docs/online-softmax-merge-engine/GIT_NOTES.md
+M  sw/snRuntime/include/perf_cnt.h
+```
+
+目的：
+
+- 复核 verbose benchmark 中 `tcdm_accessed=0` / `tcdm_congested=0` 的原因。
+- 确认 RTL/peripheral 已经把 merge engine TCDM port 纳入 `tcdm_events`。
+- 修正 runtime `perf_reg_t` 使用的 counter 数量，使其匹配生成寄存器 header 的
+  `SPATZ_CLUSTER_PERIPHERAL_PARAM_NUM_PERF_COUNTERS`，避免软件按 16 个 counter
+  计算 `hart_select` / `perf_counter` MMIO offset。
+
+验证：
+
+```text
+make -C hw/system/spatz_cluster sw.vlt
+ctest -R online-softmax-merge -V
+```
+
+结果：
+
+```text
+sw.vlt 软件全量构建完成，退出码 0。
+online-softmax-merge verbose CTest 1/1 通过，总耗时 116.14 秒。
+N=16, D=64, case=2: cpu=23017, engine=9629, tcdm_accessed=5218, tcdm_congested=16。
+```
+
+网络相关 Git 操作：
+
+```text
+暂无。
+```

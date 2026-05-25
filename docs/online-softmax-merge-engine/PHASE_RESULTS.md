@@ -301,3 +301,24 @@
   在 `N=16, D=64, case=2` 受限语义 case 中，engine path 快于 CPU reference
   path；当前记录的 TCDM counters 均为 0，应视为 counter 接线或选择仍需后续
   复核，而不是无访问量结论。
+- 2026-05-25 复核 TCDM counter 为 0 的原因：RTL/peripheral 已将
+  `{axi_soc_req, merge_req, tcdm_req}` 纳入 `tcdm_events.inc_accessed` /
+  `inc_congested`，但 `sw/snRuntime/include/perf_cnt.h` 仍按 16 个 perf
+  counters 描述 `perf_reg_t`；当前生成寄存器实际只有
+  `SPATZ_CLUSTER_PERIPHERAL_PARAM_NUM_PERF_COUNTERS == 2`，导致 runtime 对
+  `hart_select` 和 `perf_counter` 的 MMIO offset 计算错误。已将
+  `SNRT_PERF_N_CNT` 对齐到生成 header 的参数。
+- 2026-05-25 runtime perf counter layout 修正后，重新运行
+  `make -C hw/system/spatz_cluster sw.vlt`，软件全量构建完成，命令退出码为
+  0。
+- 2026-05-25 在 `hw/system/spatz_cluster/sw/build` 重新运行
+  `ctest -R online-softmax-merge -V`，1/1 测试通过，总耗时 116.14 秒，
+  TCDM counters 恢复为非零。修正后的 cycle/counter 摘要如下：
+
+  ```text
+  N=1,  D=1,  case=0: cpu=188,   engine=1253, tcdm_accessed=328,  tcdm_congested=1
+  N=4,  D=8,  case=1: cpu=915,   engine=1489, tcdm_accessed=496,  tcdm_congested=3
+  N=16, D=64, case=2: cpu=23017, engine=9629, tcdm_accessed=5218, tcdm_congested=16
+  N=4,  D=8,  case=3: cpu=938,   engine=1480, tcdm_accessed=496,  tcdm_congested=3
+  N=4,  D=8,  case=4: cpu=917,   engine=1489, tcdm_accessed=496,  tcdm_congested=3
+  ```
