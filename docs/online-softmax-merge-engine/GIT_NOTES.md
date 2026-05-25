@@ -229,3 +229,56 @@ online-softmax-merge 单项 CTest 1/1 通过，总耗时 116.35 秒。
 ```text
 暂无。
 ```
+
+## 2026-05-25 Verbose performance/counter 记录
+
+本轮计划提交：
+
+```text
+[smu] Record merge benchmark counters
+```
+
+范围：
+
+```text
+M  docs/online-softmax-merge-engine/PHASE_RESULTS.md
+M  docs/online-softmax-merge-engine/GIT_NOTES.md
+M  sw/spatzBenchmarks/online-softmax-merge/main.c
+```
+
+目的：
+
+- 将 busy-observed 硬性检查收敛到 `N=16, D=64` 长运行 case，避免短 case 中
+  软件轮询错过短暂 busy 后误报失败。
+- 运行 verbose CTest，保留 benchmark stdout 中的 `cpu`、`engine`、
+  `tcdm_accessed`、`tcdm_congested` 数值。
+- 为 Node 6 的“至少一个目标 case 中 engine path 快于 CPU scalar reference”
+  和 counter 记录要求补充证据。
+
+验证：
+
+```text
+make -C hw/system/spatz_cluster sw.vlt
+ctest -R online-softmax-merge -V
+```
+
+结果：
+
+```text
+sw.vlt 软件全量构建完成，退出码 0。
+online-softmax-merge verbose CTest 1/1 通过，总耗时 114.31 秒。
+N=16, D=64, case=2: cpu=23017, engine=9629, tcdm_accessed=0, tcdm_congested=0。
+```
+
+备注：
+
+- verbose run 之前曾观察到 `N=1, D=1` 短 case 可能因软件轮询粒度错过 busy，
+  因此本轮修正 benchmark 检查范围；该现象没有作为远端 Git 或网络问题记录。
+- 当前 TCDM counter 输出均为 0，后续应复核 counter event 是否覆盖 merge engine
+  port 或当前 counter 选择是否适用于该路径。
+
+网络相关 Git 操作：
+
+```text
+暂无。
+```

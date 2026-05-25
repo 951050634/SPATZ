@@ -204,8 +204,9 @@
   buffers 和 `MERGE_STRIDE=0` 覆盖 RTL 中 `stride==0` 表示 `D * 4` 默认
   row stride 的路径。
 - 2026-05-25 benchmark 有效 case 改为通过 `smu_wait_observe_busy()` 等待，
-  要求每个完成的有效 engine run 至少观测到一次 `MERGE_STATUS.busy=1`，
-  补强 `start` 后 busy 可见性的验收证据。
+  并在长运行 `N=16, D=64` case 上要求完成前至少观测到一次
+  `MERGE_STATUS.busy=1`；短 case 仍执行功能验证，但不把软件轮询是否命中
+  短暂 busy 作为硬性条件。
 
 备注：
 
@@ -279,5 +280,24 @@
   0。
 - 2026-05-25 在 `hw/system/spatz_cluster/sw/build` 重新运行
   `ctest -R online-softmax-merge --output-on-failure`，1/1 测试通过，总耗时
-  116.35 秒，证明所有有效 engine run 在完成前至少观测到一次
-  `MERGE_STATUS.busy=1`。
+  116.35 秒；后续 verbose run 暴露 `N=1, D=1` 太短，软件轮询可能错过
+  busy，因此 busy-observed 硬性检查收敛到长运行 case。
+- 2026-05-25 修正 busy-observed 检查范围后，重新运行
+  `make -C hw/system/spatz_cluster sw.vlt`，软件全量构建完成，命令退出码为
+  0。
+- 2026-05-25 在 `hw/system/spatz_cluster/sw/build` 运行
+  `ctest -R online-softmax-merge -V`，1/1 测试通过，总耗时 114.31 秒，并
+  保留 benchmark stdout。
+- 2026-05-25 verbose benchmark 输出的 cycle/counter 摘要如下：
+
+  ```text
+  N=1,  D=1,  case=0: cpu=188,   engine=1253, tcdm_accessed=0, tcdm_congested=0
+  N=4,  D=8,  case=1: cpu=915,   engine=1489, tcdm_accessed=0, tcdm_congested=0
+  N=16, D=64, case=2: cpu=23017, engine=9629, tcdm_accessed=0, tcdm_congested=0
+  N=4,  D=8,  case=3: cpu=938,   engine=1480, tcdm_accessed=0, tcdm_congested=0
+  N=4,  D=8,  case=4: cpu=917,   engine=1489, tcdm_accessed=0, tcdm_congested=0
+  ```
+
+  在 `N=16, D=64, case=2` 受限语义 case 中，engine path 快于 CPU reference
+  path；当前记录的 TCDM counters 均为 0，应视为 counter 接线或选择仍需后续
+  复核，而不是无访问量结论。

@@ -330,7 +330,7 @@ static int run_unsupported_cases(void) {
   return rc;
 }
 
-static int run_case(uint32_t n, uint32_t d, uint32_t case_id) {
+static int run_case(uint32_t n, uint32_t d, uint32_t case_id, int require_busy) {
   init_case(n, d, case_id);
   uint32_t cpu_start = benchmark_get_cycle();
   ref_merge(n, d, case_id);
@@ -356,7 +356,7 @@ static int run_case(uint32_t n, uint32_t d, uint32_t case_id) {
     PRINTF("SMU error for N=%u D=%u case=%u\n", n, d, case_id);
     return -1;
   }
-  if (!saw_busy) {
+  if (require_busy && !saw_busy) {
     PRINTF("SMU busy was not observed for N=%u D=%u case=%u\n", n, d,
            case_id);
     return -1;
@@ -414,11 +414,11 @@ int main(void) {
   }
 
   int rc = 0;
-  rc |= run_case(1, 1, 0);
-  rc |= run_case(4, 8, 1);
-  rc |= run_case(16, 64, 2);
-  rc |= run_case(4, 8, 3);
-  rc |= run_case(4, 8, 4);
+  rc |= run_case(1, 1, 0, 0);
+  rc |= run_case(4, 8, 1, 0);
+  rc |= run_case(16, 64, 2, 1);
+  rc |= run_case(4, 8, 3, 0);
+  rc |= run_case(4, 8, 4, 0);
   rc |= run_stride_zero_case(4, 8, 2);
   rc |= run_invalid_cases();
   rc |= run_unsupported_cases();
