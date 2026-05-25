@@ -110,3 +110,34 @@ M  sw/spatzBenchmarks/online-softmax-merge/main.c
 暂无。
 ```
 
+## 2026-05-25 Unsupported mixed-scalar 记录
+
+本轮计划提交：
+
+```text
+[smu] Reject unsupported merge cases
+```
+
+范围：
+
+```text
+M  docs/online-softmax-merge-engine/PHASE_RESULTS.md
+M  docs/online-softmax-merge-engine/GIT_NOTES.md
+M  hw/ip/online_merge/src/online_merge_update_engine.sv
+M  sw/spatzBenchmarks/online-softmax-merge/main.c
+```
+
+目的：
+
+- 将当前受限 datapath 的支持范围显式化：允许 `l_old=0`、`l_tile=0`，或
+  `m_old==m_tile && l_old==l_tile` 的等权特例。
+- 对合法但当前未支持的 mixed-scalar 输入返回 `MERGE_STATUS.error`，避免
+  benchmark 之外的输入静默得到近似错误结果。
+- 在 benchmark 中新增 `mixed-m` 和 `unequal-l` unsupported cases。
+
+网络相关 Git 操作：
+
+```text
+暂无。
+```
+

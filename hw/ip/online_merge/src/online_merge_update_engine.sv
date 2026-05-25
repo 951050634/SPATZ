@@ -167,6 +167,16 @@ module online_merge_update_engine #(
     end
   endfunction
 
+  function automatic logic supported_scalar_merge(
+    input logic [31:0] m_old_bits,
+    input logic [31:0] l_old_bits,
+    input logic [31:0] m_tile_bits,
+    input logic [31:0] l_tile_bits
+  );
+    supported_scalar_merge = (l_old_bits == 32'd0) || (l_tile_bits == 32'd0) ||
+        ((m_old_bits == m_tile_bits) && (l_old_bits == l_tile_bits));
+  endfunction
+
   function automatic void compute_scalar_merge(
     input  logic [31:0] m_old_bits,
     input  logic [31:0] l_old_bits,
@@ -337,9 +347,14 @@ module online_merge_update_engine #(
         end
 
         COMPUTE_SCALAR: begin
-          compute_scalar_merge(m_old_q, l_old_q, m_tile_q, l_tile_q, m_new_q, l_new_q);
-          store_idx_q <= '0;
-          state_q <= STORE_SCALAR;
+          if (supported_scalar_merge(m_old_q, l_old_q, m_tile_q, l_tile_q)) begin
+            compute_scalar_merge(m_old_q, l_old_q, m_tile_q, l_tile_q, m_new_q, l_new_q);
+            store_idx_q <= '0;
+            state_q <= STORE_SCALAR;
+          end else begin
+            error_q <= 1'b1;
+            state_q <= ERROR;
+          end
         end
 
         STORE_SCALAR: begin

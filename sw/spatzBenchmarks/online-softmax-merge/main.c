@@ -257,6 +257,33 @@ static int run_invalid_cases(void) {
   return rc;
 }
 
+static int run_unsupported_case(const char *name, float m_old, float m_tile,
+                                float l_old, float l_tile) {
+  init_case(1, 1, 2);
+  buf->m_old[0] = m_old;
+  buf->m_tile[0] = m_tile;
+  buf->l_old[0] = l_old;
+  buf->l_tile[0] = l_tile;
+  smu_start(buf->m_old, buf->l_old, &buf->o_old[0][0], buf->m_tile, buf->l_tile,
+            &buf->o_tile[0][0], buf->m_out, buf->l_out, &buf->o_out[0][0], 1, 1,
+            MAX_D * sizeof(float));
+  if (smu_wait_error() != 0) {
+    PRINTF("SMU unsupported case %s did not report error, status=0x%x\n", name,
+           smu_status());
+    return -1;
+  }
+  PRINTF("online-softmax-merge unsupported %s status=0x%x\n", name, smu_status());
+  smu_clear_done();
+  return 0;
+}
+
+static int run_unsupported_cases(void) {
+  int rc = 0;
+  rc |= run_unsupported_case("mixed-m", 0.0f, 1.0f, 1.0f, 1.0f);
+  rc |= run_unsupported_case("unequal-l", 1.0f, 1.0f, 1.0f, 2.0f);
+  return rc;
+}
+
 static int run_case(uint32_t n, uint32_t d, uint32_t case_id) {
   init_case(n, d, case_id);
   uint32_t cpu_start = benchmark_get_cycle();
@@ -312,6 +339,7 @@ int main(void) {
   rc |= run_case(4, 8, 3);
   rc |= run_case(4, 8, 4);
   rc |= run_invalid_cases();
+  rc |= run_unsupported_cases();
 
   if (rc == 0) {
     PRINTF("online-softmax-merge PASS\n");

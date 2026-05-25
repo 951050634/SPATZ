@@ -121,6 +121,10 @@
   stride 的错误路径。
 - 2026-05-25 benchmark 新增 invalid-config cases，覆盖 `N=0`、`D=0`、
   misaligned address 和 misaligned stride 的 `error` 状态观测。
+- 2026-05-25 RTL 新增 `supported_scalar_merge()` 检查：当前受限语义只允许
+  `l_old=0`、`l_tile=0`，或 `m_old==m_tile && l_old==l_tile` 的等权特例；
+  对其它合法但不支持的 mixed-scalar 配置显式置 `error`，避免静默写出近似
+  错误结果。
 
 备注：
 
@@ -193,6 +197,9 @@
 - 2026-05-25 benchmark 增加 `run_invalid_cases()`，对 `N=0`、`D=0`、
   misaligned address、misaligned stride 四种非法配置要求 engine cleanly report
   `MERGE_STATUS.error` 且 `busy=0`。
+- 2026-05-25 benchmark 增加 `run_unsupported_cases()`，覆盖配置合法但当前
+  受限 datapath 不支持的 `mixed-m` 和 `unequal-l` cases，要求 engine report
+  `MERGE_STATUS.error`。
 
 备注：
 
@@ -232,6 +239,15 @@
 - 2026-05-25 在 `hw/system/spatz_cluster/sw/build` 重新运行
   `ctest -R online-softmax-merge --output-on-failure`，1/1 测试通过，总耗时
   108.40 秒，覆盖有效 case 与非法配置 error-path case。
+- 2026-05-25 unsupported mixed-scalar 显式报错改动后，重新运行
+  `make -C hw/system/spatz_cluster bin/spatz_cluster.vlt`，Verilator 硬件构建
+  完成，命令退出码为 0。
+- 2026-05-25 重新运行 `make -C hw/system/spatz_cluster sw.vlt`，软件全量构建
+  完成，命令退出码为 0。
+- 2026-05-25 在 `hw/system/spatz_cluster/sw/build` 重新运行
+  `ctest -R online-softmax-merge --output-on-failure`，1/1 测试通过，总耗时
+  109.14 秒，覆盖有效 case、非法配置 error-path case 和 unsupported mixed-scalar
+  error-path case。
 
 备注：
 
@@ -239,7 +255,8 @@
   runtime/benchmark 编译 warning，以及 debug address range table warning；
   未导致构建失败。
 - 当前测试通过的是受限语义 benchmark，不能证明完整 online softmax merge
-  方程已经实现。
+  方程已经实现；不支持的 mixed-scalar 合法配置现在应显式报错，而不是返回
+  近似输出。
 - CTest 输出未展示 benchmark 内部 cycle/counter 打印；若需要性能评估证据，
   下一阶段应保留 simulator stdout 或直接运行目标并归档 `cpu`、`engine`、
   `tcdm_accessed`、`tcdm_congested` 数值。
