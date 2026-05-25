@@ -81,3 +81,32 @@ M  sw/spatzBenchmarks/CMakeLists.txt
   仍是受限语义原型的事实。
 - 尚未执行远端 Git 操作；没有网络相关 Git 失败需要记录。
 
+## 2026-05-25 Invalid-config 测试记录
+
+本轮计划提交：
+
+```text
+[smu] Cover merge engine invalid configs
+```
+
+范围：
+
+```text
+M  docs/online-softmax-merge-engine/PHASE_RESULTS.md
+M  docs/online-softmax-merge-engine/GIT_NOTES.md
+M  sw/spatzBenchmarks/online-softmax-merge/main.c
+```
+
+目的：
+
+- 在 benchmark 中保留现有有效输入 smoke/performance cases。
+- 新增 `N=0`、`D=0`、misaligned address、misaligned stride 四个非法配置
+  case，验证 engine 报告 `MERGE_STATUS.error` 且不保持 busy。
+- 补强 Node 3 的 error-path 验收证据。
+
+网络相关 Git 操作：
+
+```text
+暂无。
+```
+

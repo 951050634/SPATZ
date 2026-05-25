@@ -119,6 +119,8 @@
   `STORE_SCALAR`、`UPDATE_VECTOR`、`DONE`、`ERROR`。
 - `valid_cfg()` 覆盖 `N=0`、`D=0`、未 4-byte 对齐地址和未 4-byte 对齐
   stride 的错误路径。
+- 2026-05-25 benchmark 新增 invalid-config cases，覆盖 `N=0`、`D=0`、
+  misaligned address 和 misaligned stride 的 `error` 状态观测。
 
 备注：
 
@@ -188,13 +190,16 @@
 - Benchmark 在 TCDM 中分配 old/tile/output/ref buffers，启动 engine 后比较
   `m/l/O` 输出，并打印 CPU cycles、engine cycles、TCDM accessed 和
   congested counters。
+- 2026-05-25 benchmark 增加 `run_invalid_cases()`，对 `N=0`、`D=0`、
+  misaligned address、misaligned stride 四种非法配置要求 engine cleanly report
+  `MERGE_STATUS.error` 且 `busy=0`。
 
 备注：
 
 - 当前 CPU reference 与输入 case 被构造成匹配 RTL 的受限 merge 语义；它不是
   PLAN 中完整 online softmax 方程的通用 reference。
-- 还需要运行 `ctest -R online-softmax-merge` 或 simulator 集成测试确认目标
-  可执行并通过。
+- 2026-05-25 已通过 Verilator simulator 单项 CTest 确认 benchmark 可执行并
+  通过；覆盖范围仍限于当前受限语义和非法配置 error path。
 
 ## Node 6：验证与性能评估
 
@@ -222,6 +227,11 @@
 - 2026-05-25 在 `hw/system/spatz_cluster/sw/build` 运行
   `ctest -R online-softmax-merge --output-on-failure`，1/1 测试通过，总耗时
   90.85 秒。
+- 2026-05-25 增加 invalid-config benchmark 覆盖后，重新运行
+  `make -C hw/system/spatz_cluster sw.vlt`，软件全量构建完成，命令退出码为 0。
+- 2026-05-25 在 `hw/system/spatz_cluster/sw/build` 重新运行
+  `ctest -R online-softmax-merge --output-on-failure`，1/1 测试通过，总耗时
+  108.40 秒，覆盖有效 case 与非法配置 error-path case。
 
 备注：
 
@@ -233,3 +243,4 @@
 - CTest 输出未展示 benchmark 内部 cycle/counter 打印；若需要性能评估证据，
   下一阶段应保留 simulator stdout 或直接运行目标并归档 `cpu`、`engine`、
   `tcdm_accessed`、`tcdm_congested` 数值。
+- 2026-05-25 新增非法配置测试已经通过 `sw.vlt` 和单项 CTest 验证。

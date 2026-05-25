@@ -50,18 +50,19 @@ static int fp_close(float got, float exp) {
   return diff <= (TOL * scale);
 }
 
-void smu_start(float *m_old, float *l_old, float *o_old, float *m_tile,
-               float *l_tile, float *o_tile, float *m_out, float *l_out,
-               float *o_out, uint32_t n, uint32_t d, uint32_t stride) {
-  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_SRC_M_OLD_REG_OFFSET) = tcdm_off(m_old);
-  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_SRC_L_OLD_REG_OFFSET) = tcdm_off(l_old);
-  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_SRC_O_OLD_REG_OFFSET) = tcdm_off(o_old);
-  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_SRC_M_TILE_REG_OFFSET) = tcdm_off(m_tile);
-  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_SRC_L_TILE_REG_OFFSET) = tcdm_off(l_tile);
-  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_SRC_O_TILE_REG_OFFSET) = tcdm_off(o_tile);
-  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_DST_M_REG_OFFSET) = tcdm_off(m_out);
-  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_DST_L_REG_OFFSET) = tcdm_off(l_out);
-  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_DST_O_REG_OFFSET) = tcdm_off(o_out);
+static void smu_start_offsets(uint32_t m_old, uint32_t l_old, uint32_t o_old,
+                              uint32_t m_tile, uint32_t l_tile, uint32_t o_tile,
+                              uint32_t m_out, uint32_t l_out, uint32_t o_out,
+                              uint32_t n, uint32_t d, uint32_t stride) {
+  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_SRC_M_OLD_REG_OFFSET) = m_old;
+  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_SRC_L_OLD_REG_OFFSET) = l_old;
+  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_SRC_O_OLD_REG_OFFSET) = o_old;
+  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_SRC_M_TILE_REG_OFFSET) = m_tile;
+  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_SRC_L_TILE_REG_OFFSET) = l_tile;
+  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_SRC_O_TILE_REG_OFFSET) = o_tile;
+  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_DST_M_REG_OFFSET) = m_out;
+  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_DST_L_REG_OFFSET) = l_out;
+  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_DST_O_REG_OFFSET) = o_out;
   *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_N_REG_OFFSET) = n;
   *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_D_REG_OFFSET) = d;
   *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_STRIDE_REG_OFFSET) = stride;
@@ -69,6 +70,15 @@ void smu_start(float *m_old, float *l_old, float *o_old, float *m_tile,
       (1u << SPATZ_CLUSTER_PERIPHERAL_MERGE_CTRL_CLEAR_DONE_BIT);
   *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_CTRL_REG_OFFSET) =
       (1u << SPATZ_CLUSTER_PERIPHERAL_MERGE_CTRL_START_BIT);
+}
+
+void smu_start(float *m_old, float *l_old, float *o_old, float *m_tile,
+               float *l_tile, float *o_tile, float *m_out, float *l_out,
+               float *o_out, uint32_t n, uint32_t d, uint32_t stride) {
+  smu_start_offsets(tcdm_off(m_old), tcdm_off(l_old), tcdm_off(o_old),
+                    tcdm_off(m_tile), tcdm_off(l_tile), tcdm_off(o_tile),
+                    tcdm_off(m_out), tcdm_off(l_out), tcdm_off(o_out), n, d,
+                    stride);
 }
 
 int smu_done(void) {
@@ -82,6 +92,15 @@ static uint32_t smu_status(void) {
 
 int smu_error(void) {
   return (smu_status() >> SPATZ_CLUSTER_PERIPHERAL_MERGE_STATUS_ERROR_BIT) & 1u;
+}
+
+static int smu_busy(void) {
+  return (smu_status() >> SPATZ_CLUSTER_PERIPHERAL_MERGE_STATUS_BUSY_BIT) & 1u;
+}
+
+static void smu_clear_done(void) {
+  *cluster_reg(SPATZ_CLUSTER_PERIPHERAL_MERGE_CTRL_REG_OFFSET) =
+      (1u << SPATZ_CLUSTER_PERIPHERAL_MERGE_CTRL_CLEAR_DONE_BIT);
 }
 
 int smu_wait(void) {
@@ -196,6 +215,48 @@ static int check_case(uint32_t n, uint32_t d) {
   return 0;
 }
 
+static int smu_wait_error(void) {
+  const uint32_t max_polls = 1000000u;
+  for (uint32_t i = 0; i < max_polls; i++) {
+    if (smu_error()) {
+      return smu_busy() ? -1 : 0;
+    }
+    if (smu_done()) {
+      return -1;
+    }
+  }
+  PRINTF("SMU error timeout, status=0x%x\n", smu_status());
+  return -1;
+}
+
+static int run_invalid_case(const char *name, uint32_t n, uint32_t d,
+                            uint32_t m_old_offset, uint32_t stride) {
+  smu_start_offsets(m_old_offset, tcdm_off(buf->l_old),
+                    tcdm_off(&buf->o_old[0][0]), tcdm_off(buf->m_tile),
+                    tcdm_off(buf->l_tile), tcdm_off(&buf->o_tile[0][0]),
+                    tcdm_off(buf->m_out), tcdm_off(buf->l_out),
+                    tcdm_off(&buf->o_out[0][0]), n, d, stride);
+  if (smu_wait_error() != 0) {
+    PRINTF("SMU invalid-config case %s did not report clean error, status=0x%x\n",
+           name, smu_status());
+    return -1;
+  }
+  PRINTF("online-softmax-merge invalid %s status=0x%x\n", name, smu_status());
+  smu_clear_done();
+  return 0;
+}
+
+static int run_invalid_cases(void) {
+  uint32_t m_old = tcdm_off(buf->m_old);
+  int rc = 0;
+  rc |= run_invalid_case("n-zero", 0, 1, m_old, MAX_D * sizeof(float));
+  rc |= run_invalid_case("d-zero", 1, 0, m_old, MAX_D * sizeof(float));
+  rc |= run_invalid_case("misaligned-address", 1, 1, m_old + 1,
+                         MAX_D * sizeof(float));
+  rc |= run_invalid_case("misaligned-stride", 1, 1, m_old, 2);
+  return rc;
+}
+
 static int run_case(uint32_t n, uint32_t d, uint32_t case_id) {
   init_case(n, d, case_id);
   uint32_t cpu_start = benchmark_get_cycle();
@@ -250,6 +311,7 @@ int main(void) {
   rc |= run_case(16, 64, 2);
   rc |= run_case(4, 8, 3);
   rc |= run_case(4, 8, 4);
+  rc |= run_invalid_cases();
 
   if (rc == 0) {
     PRINTF("online-softmax-merge PASS\n");
