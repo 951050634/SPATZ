@@ -330,6 +330,67 @@ static int run_unsupported_cases(void) {
   return rc;
 }
 
+static void init_full_reference_probe_case(uint32_t n, uint32_t d) {
+  for (uint32_t i = 0; i < n; i++) {
+    float row = (float)i;
+    switch (i & 3u) {
+    case 0:
+      buf->m_old[i] = 1.25f + 0.125f * row;
+      buf->m_tile[i] = buf->m_old[i] - 0.75f;
+      buf->l_old[i] = 0.75f + 0.03125f * row;
+      buf->l_tile[i] = 0.25f + 0.015625f * row;
+      break;
+    case 1:
+      buf->m_old[i] = -0.25f + 0.0625f * row;
+      buf->m_tile[i] = buf->m_old[i] + 0.75f;
+      buf->l_old[i] = 0.50f + 0.03125f * row;
+      buf->l_tile[i] = 1.25f + 0.015625f * row;
+      break;
+    case 2:
+      buf->m_old[i] = 0.125f + 0.0625f * row;
+      buf->m_tile[i] = buf->m_old[i];
+      buf->l_old[i] = 0.25f + 0.03125f * row;
+      buf->l_tile[i] = 0.75f + 0.015625f * row;
+      break;
+    default:
+      buf->m_old[i] = -1.0f + 0.0625f * row;
+      buf->m_tile[i] = buf->m_old[i] + 0.75f;
+      buf->l_old[i] = 0.001f * (row + 1.0f);
+      buf->l_tile[i] = 0.003f * (row + 1.0f);
+      break;
+    }
+    buf->m_out[i] = 0.0f;
+    buf->l_out[i] = 0.0f;
+    for (uint32_t j = 0; j < d; j++) {
+      buf->o_old[i][j] = 0.01f * (float)((int)(i * 11 + j * 5) - 17);
+      buf->o_tile[i][j] = 0.02f * (float)((int)(i * 7 + j * 3) - 23);
+      buf->o_out[i][j] = 0.0f;
+    }
+  }
+}
+
+static int run_full_reference_probe_case(const char *name, uint32_t n,
+                                         uint32_t d) {
+  const uint32_t ref_l0_bits = 0x3f5e3b41u;
+  const uint32_t ref_o00_bits = 0xbe567a2bu;
+  init_full_reference_probe_case(n, d);
+
+  smu_start(buf->m_old, buf->l_old, &buf->o_old[0][0], buf->m_tile, buf->l_tile,
+            &buf->o_tile[0][0], buf->m_out, buf->l_out, &buf->o_out[0][0], n, d,
+            MAX_D * sizeof(float));
+  if (smu_wait_error() != 0) {
+    PRINTF("SMU full-reference probe %s did not report unsupported error, "
+           "status=0x%x\n",
+           name, smu_status());
+    return -1;
+  }
+  PRINTF("online-softmax-merge full-ref-probe %s status=0x%x ref_l0=0x%x "
+         "ref_o00=0x%x\n",
+         name, smu_status(), ref_l0_bits, ref_o00_bits);
+  smu_clear_done();
+  return 0;
+}
+
 static int run_case(uint32_t n, uint32_t d, uint32_t case_id, int require_busy) {
   init_case(n, d, case_id);
   uint32_t cpu_start = benchmark_get_cycle();
@@ -416,12 +477,16 @@ int main(void) {
   int rc = 0;
   rc |= run_case(1, 1, 0, 0);
   rc |= run_case(4, 8, 1, 0);
+  rc |= run_case(8, 16, 2, 0);
+  rc |= run_case(8, 32, 2, 0);
+  rc |= run_case(16, 32, 2, 0);
   rc |= run_case(16, 64, 2, 1);
   rc |= run_case(4, 8, 3, 0);
   rc |= run_case(4, 8, 4, 0);
   rc |= run_stride_zero_case(4, 8, 2);
   rc |= run_invalid_cases();
   rc |= run_unsupported_cases();
+  rc |= run_full_reference_probe_case("generic-mixed", 4, 8);
 
   if (rc == 0) {
     PRINTF("online-softmax-merge PASS\n");

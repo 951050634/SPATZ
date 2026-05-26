@@ -200,6 +200,12 @@
 - 2026-05-25 benchmark 增加 `run_unsupported_cases()`，覆盖配置合法但当前
   受限 datapath 不支持的 `mixed-m` 和 `unequal-l` cases，要求 engine report
   `MERGE_STATUS.error`。
+- 2026-05-26 benchmark 增加 `run_full_reference_probe_case()`，使用合法通用
+  mixed-scalar 输入覆盖 `m_old > m_tile`、`m_old < m_tile`、`m_old == m_tile`、
+  unequal `l`、small `l` 和 mixed `O` 组合；当前 RTL 仍要求该 probe 返回
+  `MERGE_STATUS.error`，并记录一个固定完整方程 golden 样本
+  `ref_l0=0x3f5e3b41`、`ref_o00=0xbe567a2b`，为后续完整 datapath 接入提供
+  测试入口。
 - 2026-05-25 benchmark 增加 `run_stride_zero_case()`，使用 packed vector
   buffers 和 `MERGE_STRIDE=0` 覆盖 RTL 中 `stride==0` 表示 `D * 4` 默认
   row stride 的路径。
@@ -212,6 +218,10 @@
 
 - 当前 CPU reference 与输入 case 被构造成匹配 RTL 的受限 merge 语义；它不是
   PLAN 中完整 online softmax 方程的通用 reference。
+- 新增 full-reference probe 只把完整方程 golden 样本作为固定证据记录，不在
+  仿真中运行昂贵的 libm 或软件浮点除法。当前它仍是 unsupported-path 测试；
+  后续 datapath 实现完整 `exp`、乘法和除法后，应把该 probe 切换为硬件输出
+  比对。
 - 2026-05-25 已通过 Verilator simulator 单项 CTest 确认 benchmark 可执行并
   通过；覆盖范围仍限于当前受限语义和非法配置 error path。
 
@@ -321,4 +331,29 @@
   N=16, D=64, case=2: cpu=23017, engine=9629, tcdm_accessed=5218, tcdm_congested=16
   N=4,  D=8,  case=3: cpu=938,   engine=1480, tcdm_accessed=496,  tcdm_congested=3
   N=4,  D=8,  case=4: cpu=917,   engine=1489, tcdm_accessed=496,  tcdm_congested=3
+  ```
+- 2026-05-26 新增 full-reference probe 后，重新运行
+  `make -C hw/system/spatz_cluster sw.vlt`，软件全量构建完成，命令退出码为
+  0。
+- 2026-05-26 在 `hw/system/spatz_cluster/sw/build` 运行
+  `ctest -R online-softmax-merge -V`，1/1 测试通过，总耗时 148.11 秒。
+  新增 probe 输出如下：
+
+  ```text
+  online-softmax-merge full-ref-probe generic-mixed status=0x4 ref_l0=0x3f5e3b41 ref_o00=0xbe567a2b
+  ```
+- 2026-05-26 根据用户要求增加 `N/D` sweep，复跑
+  `ctest -R online-softmax-merge -V` 并形成
+  [COMPARISON_EXPERIMENT.md](COMPARISON_EXPERIMENT.md)。本次 1/1 测试通过，
+  总耗时 231.66 秒。有效 case 的 CPU scalar path 与 engine path 对比如下：
+
+  ```text
+  N=1,  D=1,  case=0: cpu=174,   engine=1225, speedup=0.14x
+  N=4,  D=8,  case=1: cpu=902,   engine=1451, speedup=0.62x
+  N=8,  D=16, case=2: cpu=3126,  engine=2276, speedup=1.37x
+  N=8,  D=32, case=2: cpu=5933,  engine=3284, speedup=1.81x
+  N=16, D=32, case=2: cpu=11736, engine=5490, speedup=2.14x
+  N=16, D=64, case=2: cpu=23013, engine=9635, speedup=2.39x
+  N=4,  D=8,  case=3: cpu=907,   engine=1408, speedup=0.64x
+  N=4,  D=8,  case=4: cpu=913,   engine=1383, speedup=0.66x
   ```

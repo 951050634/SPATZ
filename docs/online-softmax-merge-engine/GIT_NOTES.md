@@ -327,3 +327,102 @@ N=16, D=64, case=2: cpu=23017, engine=9629, tcdm_accessed=5218, tcdm_congested=1
 ```text
 暂无。
 ```
+
+## 2026-05-26 Full-reference probe 记录
+
+本轮计划提交：
+
+```text
+[smu] Add full merge reference probe
+```
+
+范围：
+
+```text
+M  docs/online-softmax-merge-engine/PHASE_RESULTS.md
+M  docs/online-softmax-merge-engine/GIT_NOTES.md
+M  sw/spatzBenchmarks/online-softmax-merge/main.c
+```
+
+目的：
+
+- 阅读并复核 `docs/online-softmax-merge-engine/` 后，确认当前实现仍是受限
+  merge 语义原型，完整 `exp`、乘法缩放和除法归一化 datapath 尚未接入。
+- 在 benchmark 中新增合法通用 mixed-scalar probe，覆盖后续完整 online
+  softmax merge 方程需要处理的 `m_old > m_tile`、`m_old < m_tile`、
+  `m_old == m_tile`、unequal `l`、small `l` 和 mixed `O` 输入组合。
+- 当前 RTL 对该 probe 仍应返回 `MERGE_STATUS.error`，避免静默输出近似错误；
+  probe 同时记录固定完整方程 golden 样本，供后续 datapath 实现后切换为
+  输出比对使用。
+- 曾尝试在 probe 中运行 `expf` 和运行时浮点除法，但 Verilator/bare-metal
+  测试耗时不可接受；最终改为固定 golden 样本，保持测试目的并恢复单测时长。
+
+验证：
+
+```text
+make -C hw/system/spatz_cluster sw.vlt
+ctest -R online-softmax-merge -V
+```
+
+结果：
+
+```text
+sw.vlt 软件全量构建完成，退出码 0。
+online-softmax-merge verbose CTest 1/1 通过，总耗时 148.11 秒。
+full-ref-probe generic-mixed status=0x4 ref_l0=0x3f5e3b41 ref_o00=0xbe567a2b。
+```
+
+网络相关 Git 操作：
+
+```text
+暂无。
+```
+
+## 2026-05-26 Comparison experiment 记录
+
+本轮计划提交：
+
+```text
+[smu] Record merge engine comparison experiment
+```
+
+范围：
+
+```text
+M  docs/online-softmax-merge-engine/README.md
+M  docs/online-softmax-merge-engine/PHASE_RESULTS.md
+A  docs/online-softmax-merge-engine/COMPARISON_EXPERIMENT.md
+M  sw/spatzBenchmarks/online-softmax-merge/main.c
+```
+
+目的：
+
+- 回答“不采用模块”和“采用模块”的差距。这里将“不采用模块”定义为
+  benchmark 中的 CPU scalar reference path，将“采用模块”定义为 MMIO 启动
+  cluster-local merge engine path。
+- 在 benchmark 中增加 `N=8,D=16`、`N=8,D=32`、`N=16,D=32` 三个中间规模
+  sweep 点，定位当前受限语义原型的 break-even 区间。
+- 新增 `COMPARISON_EXPERIMENT.md`，记录实验目的、原始数据、speedup 计算、
+  评估方法和结论边界。
+
+验证：
+
+```text
+make -C hw/system/spatz_cluster sw.vlt
+ctest -R online-softmax-merge -V
+```
+
+结果：
+
+```text
+sw.vlt 软件全量构建完成，退出码 0。
+online-softmax-merge verbose CTest 1/1 通过，总耗时 231.66 秒。
+N=4,D=8 仍慢于 CPU；N=8,D=16 已达到 1.37x；N=16,D=64 达到 2.39x。
+当前受限语义下 break-even 位于 32 到 128 个 vector 元素之间。
+```
+
+网络相关 Git 操作：
+
+```text
+暂无。
+```
