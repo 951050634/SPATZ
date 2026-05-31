@@ -1,0 +1,28 @@
+# LaTeX build products
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.nav
+*.snm
+*.vrb
+
+# Generated PDFs are build artifacts in this workspace.
+*.pdf
+
+# Optional local build directory.
+build/
+
+# Editor and OS noise
+*~
+.#*
+.DS_Store

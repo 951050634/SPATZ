@@ -477,7 +477,11 @@ int main(void) {
   int rc = 0;
   rc |= run_case(1, 1, 0, 0);
   rc |= run_case(4, 8, 1, 0);
+  rc |= run_case(8, 8, 2, 0);
+  rc |= run_case(8, 12, 2, 0);
+  rc |= run_case(4, 16, 2, 0);
   rc |= run_case(8, 16, 2, 0);
+  rc |= run_case(8, 24, 2, 0);
   rc |= run_case(8, 32, 2, 0);
   rc |= run_case(16, 32, 2, 0);
   rc |= run_case(16, 64, 2, 1);

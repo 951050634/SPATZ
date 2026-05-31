@@ -357,3 +357,29 @@
   N=4,  D=8,  case=3: cpu=907,   engine=1408, speedup=0.64x
   N=4,  D=8,  case=4: cpu=913,   engine=1383, speedup=0.66x
   ```
+
+- 2026-05-31 为论文 A 补齐 break-even 附近 sweep，新增
+  `N=8,D=8`、`N=8,D=12`、`N=4,D=16`、`N=8,D=24`。重新运行
+  `make -C hw/system/spatz_cluster sw.vlt`，软件全量构建完成，命令退出码为
+  0。
+- 2026-05-31 在 `hw/system/spatz_cluster/sw/build` 连续三次运行
+  `ctest -R online-softmax-merge -V`，三次均 1/1 通过，总耗时分别为
+  229.02 秒、232.16 秒和 219.20 秒；有效 case 的 cycle 和 TCDM counter
+  逐项一致。最新有效 case 摘要如下：
+
+  ```text
+  N=1,  D=1,  case=0: cpu=191,   engine=1216, speedup=0.16x
+  N=4,  D=8,  case=1: cpu=915,   engine=1486, speedup=0.62x
+  N=8,  D=8,  case=2: cpu=1704,  engine=1789, speedup=0.95x
+  N=8,  D=12, case=2: cpu=2433,  engine=2011, speedup=1.21x
+  N=4,  D=16, case=2: cpu=1613,  engine=1694, speedup=0.95x
+  N=8,  D=16, case=2: cpu=3114,  engine=2254, speedup=1.38x
+  N=8,  D=24, case=2: cpu=4520,  engine=2798, speedup=1.62x
+  N=8,  D=32, case=2: cpu=5910,  engine=3284, speedup=1.80x
+  N=16, D=32, case=2: cpu=11744, engine=5502, speedup=2.13x
+  N=16, D=64, case=2: cpu=23033, engine=9607, speedup=2.40x
+  ```
+
+  当前受限等权 case 的 break-even 位于约 64 到 96 个 vector elements 之间。
+  最新数据已同步到 [COMPARISON_EXPERIMENT.md](COMPARISON_EXPERIMENT.md) 和
+  `data_process/attnres/data/online_softmax_merge_bypass.csv`。

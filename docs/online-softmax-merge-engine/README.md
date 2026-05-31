@@ -15,6 +15,8 @@ feature/online-softmax-merge-engine
 - [GIT_NOTES.md](GIT_NOTES.md)：分支状态、提交策略和 Git 操作记录。
 - [COMPARISON_EXPERIMENT.md](COMPARISON_EXPERIMENT.md)：CPU scalar path 与
   merge engine path 的 A/B 对比实验、原始数据和评估结论。
+- [PAPER_ROADMAP.md](PAPER_ROADMAP.md)：受限语义原型论文和完整
+  online softmax/attention 加速论文的双路线规划。
 
 v1 的默认方向是在 cluster 内新增一个由 MMIO 寄存器控制、带 TCDM master 端口的 Streaming Merge-Update Engine。软件负责配置地址和维度并启动引擎，硬件直接在 TCDM 中流式读取和更新 online softmax merge 状态。
 

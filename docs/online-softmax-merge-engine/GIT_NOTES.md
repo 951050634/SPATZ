@@ -110,6 +110,143 @@ M  sw/spatzBenchmarks/online-softmax-merge/main.c
 暂无。
 ```
 
+## 2026-05-31 Paper A and LaTeX workspace 记录
+
+本轮计划提交：
+
+```text
+[paper] Prepare restricted merge paper workspace
+```
+
+范围：
+
+```text
+M  sw/spatzBenchmarks/online-softmax-merge/main.c
+M  docs/online-softmax-merge-engine/README.md
+M  docs/online-softmax-merge-engine/PHASE_RESULTS.md
+M  docs/online-softmax-merge-engine/COMPARISON_EXPERIMENT.md
+A  docs/online-softmax-merge-engine/PAPER_ROADMAP.md
+M  data_process/attnres/README.md
+M  data_process/attnres/code/plot_attnres_results.py
+M  data_process/attnres/data/online_softmax_merge_bypass.csv
+A  data_process/attnres/data/online_softmax_merge_bypass_stability.csv
+A  data_process/attnres/pic/online_softmax_merge_bypass_break_even.png
+A  data_process/attnres/pic/online_softmax_merge_bypass_tcdm.png
+A  data_process/attnres/pic/online_softmax_merge_cluster_integration.png
+A  data_process/attnres/pic/online_softmax_merge_engine_flow.png
+A  latex/
+```
+
+目的：
+
+- 将当前工作规划为论文 A 和论文 B 两条路线。论文 A 收敛为受限语义原型论文；
+  论文 B 预留完整 online softmax/attention 加速方向。
+- 为论文 A 补齐 break-even 附近 sweep：
+  `N=8,D=8`、`N=8,D=12`、`N=4,D=16`、`N=8,D=24`。
+- 连续三次运行 verbose CTest，确认有效 case 的 cycle/counter 输出逐项一致。
+- 更新 CSV、实验文档和绘图脚本，新增 break-even、TCDM counter、engine flow、
+  cluster integration 图。
+- 建立 `latex/` 工作区，并重构为 `common/` 与 `papers/paper-a`、
+  `papers/paper-b` 布局；保留 `paper_a.tex` 和 `paper_b.tex` 兼容入口。
+- 在当前 Linux 用户目录安装 TeX Live，并验证 `paper_a.tex` 与 `paper_b.tex`
+  都可从 `latex/` 根目录用 `latexmk` 编译。
+- `latex/.gitignore` 忽略 LaTeX 编译产物和生成 PDF，只保留源码、共享 bib、
+  README 和 TeX Live profile。
+
+验证：
+
+```text
+make -C hw/system/spatz_cluster sw.vlt
+ctest -R online-softmax-merge -V
+ctest -R online-softmax-merge -V
+ctest -R online-softmax-merge -V
+source .venv/bin/activate
+python data_process/attnres/code/plot_attnres_results.py
+cd latex
+latexmk -pdf -interaction=nonstopmode -halt-on-error paper_a.tex
+latexmk -pdf -interaction=nonstopmode -halt-on-error paper_b.tex
+```
+
+结果：
+
+```text
+sw.vlt 软件全量构建完成，退出码 0。
+三次 online-softmax-merge verbose CTest 均 1/1 通过，总耗时分别为
+229.02 秒、232.16 秒和 219.20 秒。
+三次有效 case 的 cycle/counter 数据逐项一致。
+N=16,D=64 达到 2.40x speedup，cycle reduction 约 58.3%。
+受限等权 case 的 break-even 位于约 64 到 96 个 vector elements 之间。
+绘图脚本成功生成 AttnRes/SMU 图表。
+paper_a.pdf 成功生成，4 页；paper_b.pdf 成功生成，1 页。
+```
+
+网络相关 Git 操作：
+
+```text
+安装 TeX Live 时 TinyTeX GitHub 下载失败，改用 CTAN/SJTU 镜像完成用户级安装。
+未执行远端 Git push/pull。
+```
+
+## 2026-05-31 Paper A sweep and draft 记录
+
+本轮计划提交：
+
+```text
+[smu] Prepare restricted merge-update paper draft
+```
+
+范围：
+
+```text
+M  sw/spatzBenchmarks/online-softmax-merge/main.c
+M  docs/online-softmax-merge-engine/COMPARISON_EXPERIMENT.md
+M  docs/online-softmax-merge-engine/PHASE_RESULTS.md
+M  data_process/attnres/README.md
+M  data_process/attnres/code/plot_attnres_results.py
+M  data_process/attnres/data/online_softmax_merge_bypass.csv
+A  data_process/attnres/data/online_softmax_merge_bypass_stability.csv
+A  data_process/attnres/pic/online_softmax_merge_bypass_break_even.png
+A  data_process/attnres/pic/online_softmax_merge_bypass_tcdm.png
+A  latex/
+```
+
+目的：
+
+- 为论文 A 补齐 break-even 附近 sweep 点：
+  `N=8,D=8`、`N=8,D=12`、`N=4,D=16`、`N=8,D=24`。
+- 连续三次运行 verbose CTest，确认有效 case 的 cycle/counter 输出逐项一致。
+- 更新 CSV、可视化脚本和图表，新增 break-even 图与 TCDM counter 图。
+- 在 `latex/` 中建立论文 A 初稿，保留 README 中“不要求本机编译 LaTeX”的要求。
+
+验证：
+
+```text
+make -C hw/system/spatz_cluster sw.vlt
+ctest -R online-softmax-merge -V
+ctest -R online-softmax-merge -V
+ctest -R online-softmax-merge -V
+source .venv/bin/activate
+python data_process/attnres/code/plot_attnres_results.py
+```
+
+结果：
+
+```text
+sw.vlt 软件全量构建完成，退出码 0。
+三次 online-softmax-merge verbose CTest 均 1/1 通过，总耗时分别为
+229.02 秒、232.16 秒和 219.20 秒。
+三次有效 case 的 cycle/counter 数据逐项一致。
+N=16,D=64 达到 2.40x speedup，cycle reduction 约 58.3%。
+受限等权 case 的 break-even 位于约 64 到 96 个 vector elements 之间。
+绘图脚本使用 .venv 成功生成 AttnRes/SMU 图表。
+```
+
+网络相关 Git 操作：
+
+```text
+暂无。
+```
+
 ## 2026-05-25 Unsupported mixed-scalar 记录
 
 本轮计划提交：

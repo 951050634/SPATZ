@@ -11,13 +11,18 @@ data_process/attnres/
 │   └── plot_attnres_results.py
 ├── data/
 │   ├── attnres_software_baselines.csv
-│   └── online_softmax_merge_bypass.csv
+│   ├── online_softmax_merge_bypass.csv
+│   └── online_softmax_merge_bypass_stability.csv
 └── pic/
     ├── attnres_software_traffic.png
     ├── attnres_software_error.png
+    ├── online_softmax_merge_bypass_break_even.png
     ├── online_softmax_merge_bypass_cycles.png
     ├── online_softmax_merge_bypass_speedup.png
-    └── online_softmax_merge_bypass_runtime_proxy.png
+    ├── online_softmax_merge_bypass_runtime_proxy.png
+    ├── online_softmax_merge_bypass_tcdm.png
+    ├── online_softmax_merge_cluster_integration.png
+    └── online_softmax_merge_engine_flow.png
 ```
 
 ## 复现方式
@@ -133,6 +138,16 @@ docs/online-softmax-merge-engine/COMPARISON_EXPERIMENT.md
 | `tcdm_accessed` | engine path 运行期间的 TCDM accessed 硬件计数器。 |
 | `tcdm_congested` | engine path 运行期间的 TCDM congested 硬件计数器。 |
 
+### `case_id` 语义
+
+| case_id | 语义 |
+|---:|---|
+| 0 | `l_tile=0`，输出选择 old state。 |
+| 1 | `l_old=0`，输出选择 tile state。 |
+| 2 | `m_old==m_tile && l_old==l_tile`，等权 merge，主要用于规模 sweep。 |
+| 3 | `m_old==m_tile && l_old==l_tile`，小 `l` 等权 case。 |
+| 4 | `m_old==m_tile && l_old==l_tile`，另一组小 `l` 等权 case。 |
+
 ### 派生指标
 
 ```text
@@ -159,8 +174,14 @@ cycle_reduction = (cpu_cycles - engine_cycles) / cpu_cycles
 
 - 展示 `cpu_cycles / engine_cycles`。
 - 虚线 `1.0x` 是 break-even。
-- 当前数据中 `N=16,D=64` 达到约 `2.39x` speedup。
+- 当前数据中 `N=16,D=64` 达到约 `2.40x` speedup。
 - 小规模 case 例如 `N=1,D=1`、`N=4,D=8` 仍然是 engine 更慢，说明固定开销占主导。
+
+`online_softmax_merge_bypass_break_even.png`
+
+- 只展示 `case_id=2` 的受限等权 merge sweep。
+- `N=4,D=16` 和 `N=8,D=8` 仍慢，`N=8,D=12` 已经超过 break-even。
+- 当前数据说明 break-even 位于约 64 到 96 个 vector elements 之间。
 
 `online_softmax_merge_bypass_runtime_proxy.png`
 
@@ -169,6 +190,28 @@ cycle_reduction = (cpu_cycles - engine_cycles) / cpu_cycles
 - 在固定频率假设下，cycle 比例可以作为 runtime 比例的 proxy。
 - 这张图适合组会展示“运行时间趋势”，但严格来说它仍然来源于 cycle，而不是 wall time。
 
+`online_softmax_merge_bypass_tcdm.png`
+
+- 展示 engine path 运行期间的 TCDM accessed 和 congested counters。
+- accessed 随 `N*D` 增长，说明 engine 确实通过新增 TCDM master 端口产生访存。
+- congested 计数非零但远低于 accessed；当前单 engine microbenchmark 中它不是主导瓶颈。
+
+`online_softmax_merge_engine_flow.png`
+
+- 展示论文 A 使用的 engine 控制流图，包括正常流和 error path。
+
+`online_softmax_merge_cluster_integration.png`
+
+- 展示论文 A 使用的 Spatz cluster 集成图，标出 core TCDM ports、AXI-to-TCDM、
+  merge engine TCDM master、TCDM interconnect、TCDM banks 和 MMIO 寄存器控制路径。
+
+### 稳定性记录
+
+`data/online_softmax_merge_bypass_stability.csv` 保存三次 verbose CTest 的有效
+case 输出。三次运行的 cycle 和 TCDM counter 逐项一致；CTest wall time 分别为
+229.02 秒、232.16 秒和 219.20 秒。论文中应使用 cycle/counter 作为主要指标，
+不要把 wall time 当作架构性能结论。
+
 ## 当前可以支撑的结论
 
 1. AttnRes 软件侧 baseline 在合成输入上输出一致，误差低于 `1e-3` 阈值。
@@ -176,8 +219,9 @@ cycle_reduction = (cpu_cycles - engine_cycles) / cpu_cycles
    状态 traffic 的削减更明显。
 3. 对 online softmax merge 类 workload，cluster-local merge engine 旁路在
    足够大的 `N,D` 下能显著降低 cycle。
-4. 当前最强数据点是 `N=16,D=64`，speedup 约为 `2.39x`，cycle reduction 约为
-   `58.1%`。
+4. 当前最强数据点是 `N=16,D=64`，speedup 约为 `2.40x`，cycle reduction 约为
+   `58.3%`。
+5. 当前受限等权 case 的 break-even 位于约 64 到 96 个 vector elements 之间。
 
 ## 当前不能直接外推的结论
 
@@ -189,11 +233,7 @@ cycle_reduction = (cpu_cycles - engine_cycles) / cpu_cycles
 
 ## 建议的下一步方向
 
-1. 在 `N*D=32` 到 `N*D=128` 之间增加更细粒度 sweep，例如 `N=4,D=16`、
-   `N=8,D=8`、`N=8,D=12`，更准确定位 break-even。
-2. 为旁路路径补充真实 wall time 统计。如果平台测试时间稳定，可以与 cycle 图一起
-   展示。
-3. 扩展 merge engine datapath，支持完整 online-softmax merge 方程，然后把当前
+1. 扩展 merge engine datapath，支持完整 online-softmax merge 方程，然后把当前
    expected-error 的 full-reference probe 改成真正输出比对。
-4. 在完整 datapath 可用后，重新生成同样的 CPU vs engine A/B 图，形成更强的论文
+2. 在完整 datapath 可用后，重新生成同样的 CPU vs engine A/B 图，形成更强的论文
    证据链。

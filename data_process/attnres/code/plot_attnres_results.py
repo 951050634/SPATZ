@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
+# Copyright 2023 ETH Zurich and University of Bologna.
+# Licensed under the Apache License, Version 2.0, see LICENSE for details.
+# SPDX-License-Identifier: Apache-2.0
+
 import csv
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from matplotlib.patches import FancyArrowPatch
+from matplotlib.patches import Rectangle
 
 
 COLORS = {
@@ -12,6 +18,8 @@ COLORS = {
     "cpu": "#4c78a8",
     "engine": "#e45756",
     "speedup": "#72b7b2",
+    "accessed": "#59a14f",
+    "congested": "#b07aa1",
 }
 
 
@@ -273,6 +281,196 @@ def plot_bypass_runtime_proxy(rows, out_path: Path):
     plt.close()
 
 
+def plot_bypass_tcdm(rows, out_path: Path):
+    labels = [bypass_case_label(row) for row in rows]
+    x = list(range(len(labels)))
+    width = 0.36
+
+    plt.figure(figsize=(11.2, 5.6))
+    accessed_bars = plt.bar(
+        [i - width / 2 for i in x],
+        [row["tcdm_accessed"] for row in rows],
+        width=width,
+        label="TCDM accessed",
+        color=COLORS["accessed"],
+    )
+    congested_bars = plt.bar(
+        [i + width / 2 for i in x],
+        [row["tcdm_congested"] for row in rows],
+        width=width,
+        label="TCDM congested",
+        color=COLORS["congested"],
+    )
+    for bar in list(accessed_bars) + list(congested_bars):
+        val = bar.get_height()
+        if val == 0:
+            continue
+        plt.text(
+            bar.get_x() + bar.get_width() / 2,
+            val + 70,
+            f"{int(val)}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+            rotation=90,
+        )
+
+    plt.title("Online Softmax Merge: Engine TCDM Counters")
+    plt.xlabel("Benchmark case")
+    plt.ylabel("Counter value")
+    plt.xticks(x, labels, rotation=30, ha="right")
+    plt.grid(axis="y", alpha=0.25)
+    plt.legend(fontsize=9)
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=180)
+    plt.close()
+
+
+def plot_bypass_break_even(rows, out_path: Path):
+    filtered = sorted(
+        [row for row in rows if row["case_id"] == 2],
+        key=lambda row: (row["N"] * row["D"], row["N"], row["D"]),
+    )
+    x = [row["N"] * row["D"] for row in filtered]
+    speedups = [row["speedup"] for row in filtered]
+    labels = [f"N{row['N']} D{row['D']}" for row in filtered]
+
+    plt.figure(figsize=(8.8, 5.2))
+    plt.plot(x, speedups, marker="o", linewidth=2.0, color=COLORS["speedup"])
+    plt.axhline(1.0, color="#444444", linestyle="--", linewidth=1.2, label="break-even")
+    for xpos, speedup, label in zip(x, speedups, labels):
+        plt.text(
+            xpos,
+            speedup + 0.05,
+            f"{label}\n{speedup:.2f}x",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
+
+    plt.title("Online Softmax Merge: Break-Even Sweep for Case 2")
+    plt.xlabel("Vector elements processed (N x D)")
+    plt.ylabel("Speedup = CPU cycles / engine cycles")
+    plt.grid(alpha=0.25)
+    plt.legend(fontsize=9)
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=180)
+    plt.close()
+
+
+def draw_box(ax, xy, width, height, text, facecolor):
+    box = Rectangle(
+        xy,
+        width,
+        height,
+        linewidth=1.4,
+        edgecolor="#333333",
+        facecolor=facecolor,
+    )
+    ax.add_patch(box)
+    ax.text(
+        xy[0] + width / 2,
+        xy[1] + height / 2,
+        text,
+        ha="center",
+        va="center",
+        fontsize=10,
+        wrap=True,
+    )
+
+
+def draw_arrow(ax, start, end):
+    arrow = FancyArrowPatch(
+        start,
+        end,
+        arrowstyle="-|>",
+        mutation_scale=14,
+        linewidth=1.4,
+        color="#333333",
+    )
+    ax.add_patch(arrow)
+
+
+def plot_engine_flow(out_path: Path):
+    states = [
+        "IDLE",
+        "LOAD\nSCALAR",
+        "COMPUTE\nSCALAR",
+        "STORE\nSCALAR",
+        "UPDATE\nVECTOR",
+        "DONE",
+    ]
+    plt.figure(figsize=(11.4, 3.0))
+    ax = plt.gca()
+    ax.set_xlim(0, 12)
+    ax.set_ylim(0, 3)
+    ax.axis("off")
+
+    x0 = 0.3
+    width = 1.55
+    gap = 0.38
+    for i, state in enumerate(states):
+        x = x0 + i * (width + gap)
+        draw_box(ax, (x, 1.45), width, 0.75, state, "#dbe9f6")
+        if i > 0:
+            prev_x = x0 + (i - 1) * (width + gap)
+            draw_arrow(ax, (prev_x + width, 1.82), (x, 1.82))
+
+    draw_box(ax, (4.55, 0.28), 2.9, 0.65, "ERROR", "#f4cccc")
+    ax.text(
+        6.0,
+        1.08,
+        "invalid config or unsupported scalar merge",
+        ha="center",
+        va="center",
+        fontsize=9,
+        color="#555555",
+    )
+    draw_arrow(ax, (2.9, 1.45), (5.2, 0.93))
+    draw_arrow(ax, (6.1, 1.45), (6.25, 0.93))
+
+    plt.title("Streaming Merge-Update Engine Control Flow")
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=180)
+    plt.close()
+
+
+def plot_cluster_integration(out_path: Path):
+    plt.figure(figsize=(10.8, 5.4))
+    ax = plt.gca()
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, 6)
+    ax.axis("off")
+
+    draw_box(ax, (0.55, 4.55), 2.0, 0.75, "Core TCDM\nports", "#dbe9f6")
+    draw_box(ax, (4.0, 4.55), 2.0, 0.75, "AXI-to-TCDM\nport", "#e2f0d9")
+    draw_box(ax, (7.2, 4.55), 2.25, 0.75, "Merge engine\nTCDM master", "#fce4d6")
+    draw_box(ax, (3.0, 2.75), 4.0, 0.82, "Spatz narrow TCDM interconnect", "#fff2cc")
+    draw_box(ax, (3.15, 1.0), 3.7, 0.82, "Cluster TCDM banks", "#eadcf8")
+    draw_box(ax, (7.2, 2.2), 2.25, 0.75, "MMIO MERGE_*\nregisters", "#eeeeee")
+
+    draw_arrow(ax, (1.55, 4.55), (3.35, 3.57))
+    draw_arrow(ax, (5.0, 4.55), (5.0, 3.57))
+    draw_arrow(ax, (8.32, 4.55), (6.65, 3.57))
+    draw_arrow(ax, (5.0, 2.75), (5.0, 1.82))
+    draw_arrow(ax, (8.32, 2.95), (8.32, 4.55))
+
+    ax.text(
+        8.75,
+        3.65,
+        "start,\nclear_done,\nbusy/done/error",
+        ha="center",
+        va="center",
+        fontsize=9,
+        color="#555555",
+    )
+
+    plt.title("Cluster-Local Integration of the Merge Engine")
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=180)
+    plt.close()
+
+
 def main():
     base_dir = Path(__file__).resolve().parent.parent
     data_dir = base_dir / "data"
@@ -290,6 +488,13 @@ def main():
         bypass_rows,
         out_dir / "online_softmax_merge_bypass_runtime_proxy.png",
     )
+    plot_bypass_tcdm(bypass_rows, out_dir / "online_softmax_merge_bypass_tcdm.png")
+    plot_bypass_break_even(
+        bypass_rows,
+        out_dir / "online_softmax_merge_bypass_break_even.png",
+    )
+    plot_engine_flow(out_dir / "online_softmax_merge_engine_flow.png")
+    plot_cluster_integration(out_dir / "online_softmax_merge_cluster_integration.png")
 
     print(f"Generated AttnRes plots in: {out_dir}")
 

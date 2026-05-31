@@ -1,0 +1,398 @@
+\documentclass[conference]{IEEEtran}
+
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{url}
+
+\title{Cluster-Local Streaming Merge-Update Offload for Online Softmax State Updates on Spatz}
+
+\author{
+  \IEEEauthorblockN{Wenxuan Tang}
+  \IEEEauthorblockA{Local Spatz Prototype Study}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Online softmax-style state updates maintain short-lived scalar and vector
+state across streaming tiles~\cite{online-softmax2018}. On a compact vector
+cluster, these updates can be
+awkward for a tensor- or vector-centric execution path: the work mixes scalar
+state, vector payloads, fine-grained memory traffic, and a strict update order.
+This paper presents a cluster-local streaming merge-update offload prototype
+for Spatz. The design adds a memory-mapped control interface and one TCDM
+master port, leaving the Spatz ISA, decoder, vector functional units, and
+register files unchanged. The current prototype intentionally implements a
+restricted merge semantics: zero-length old or tile states and equal-weight
+same-exponent merges. Under this restricted semantics, a Verilator
+microbenchmark shows that the engine is slower for tiny workloads because of
+fixed MMIO and polling overheads, but reaches 2.40$\times$ speedup and a
+58.3\% cycle reduction at $N=16,D=64$. A finer break-even sweep places the
+threshold between roughly 64 and 96 vector elements for the equal-weight case.
+The result supports cluster-local offload as a promising mechanism for
+state-update-heavy online softmax kernels, while making clear that complete
+mixed-scalar online softmax and end-to-end attention acceleration require a
+future datapath with exponential, scaling, and normalization support.
+\end{abstract}
+
+\section{Introduction}
+
+Attention implementations often rely on online softmax formulations to merge
+partial summaries without materializing every intermediate score. Each merge
+updates a scalar maximum $m$, a scalar normalizer $l$, and an output vector
+$O$. The operation has a small amount of arithmetic per element, a strict state
+dependency per row, and frequent access to short-lived intermediate state. This
+shape does not naturally match a path optimized for large regular vector or
+matrix kernels.
+
+This work studies whether a small cluster-local offload block can handle this
+state-update pattern more efficiently than scalar software on the cluster core.
+The implemented prototype is deliberately conservative. It does not introduce
+new instructions and does not modify Spatz pipeline files. Instead, software
+programs a memory-mapped merge engine, the engine reads and writes TCDM data
+through its own master port, and software observes completion through status
+bits.
+
+The paper makes three contributions:
+
+\begin{itemize}
+  \item It integrates a streaming merge-update engine into the Spatz cluster
+        through MMIO control and a TCDM master port, without changing the ISA or
+        vector pipeline.
+  \item It defines and validates a restricted online-softmax merge prototype,
+        including correct outputs for supported cases and explicit error
+        reporting for invalid or unsupported inputs.
+  \item It evaluates CPU scalar execution against the offload path in
+        Verilator, reporting cycles, break-even behavior, and TCDM access and
+        congestion counters.
+\end{itemize}
+
+The scope is also explicit. This is not yet a full online softmax datapath and
+does not claim end-to-end attention speedup. The missing pieces are
+exponential evaluation, weighted scaling, and normalization division for
+general mixed-scalar inputs.
+
+\section{Background and Motivation}
+
+\subsection{Online Softmax Merge State}
+
+For a complete online softmax merge, two summaries are combined as:
+
+\begin{align}
+m_{new} &= \max(m_{old}, m_{tile}), \\
+l_{new} &= l_{old}e^{m_{old}-m_{new}} +
+           l_{tile}e^{m_{tile}-m_{new}}, \\
+O_{new} &= O_{old}
+          \frac{l_{old}e^{m_{old}-m_{new}}}{l_{new}} +
+          O_{tile}
+          \frac{l_{tile}e^{m_{tile}-m_{new}}}{l_{new}}.
+\end{align}
+
+The current RTL prototype implements only a subset of this equation:
+\texttt{l\_old=0}, \texttt{l\_tile=0}, and constructed equal-weight cases where
+\texttt{m\_old==m\_tile} and \texttt{l\_old==l\_tile}. Other legal
+mixed-scalar inputs are detected and reported as unsupported errors rather
+than producing silent approximations.
+
+\subsection{Spatz and TCDM}
+
+Spatz is a compact vector-capable cluster system built around compact
+RISC-V-based vector units and Snitch scalar cores~\cite{spatz2023,snitch2020}.
+It provides tightly coupled data memory (TCDM) close to the cores and
+accelerators. The online merge prototype
+uses this memory hierarchy directly: all input and output buffers reside in
+TCDM, and the engine issues its own TCDM requests. This placement keeps the
+offload local to the cluster and avoids changing the external memory system.
+
+\subsection{Why Offload This Pattern}
+
+The merge-update operation is small, ordered, and stateful. A scalar software
+implementation pays instruction overhead for every row and vector element. A
+streaming engine can amortize setup overhead over many elements, use a fixed
+state machine for memory scheduling, and avoid repeatedly re-executing the same
+control sequence in software. The key question is whether the fixed MMIO and
+polling overheads can be amortized for practical problem sizes.
+
+\section{Design}
+
+\subsection{Software-Visible Interface}
+
+Software configures the engine using memory-mapped registers. Table
+\ref{tab:mmio} summarizes the interface.
+
+\begin{table}[t]
+\centering
+\caption{Memory-mapped merge engine interface.}
+\label{tab:mmio}
+\begin{tabular}{ll}
+\toprule
+Register & Purpose \\
+\midrule
+\texttt{MERGE\_SRC\_M\_OLD} & Base address of old $m$ array \\
+\texttt{MERGE\_SRC\_L\_OLD} & Base address of old $l$ array \\
+\texttt{MERGE\_SRC\_O\_OLD} & Base address of old $O$ matrix \\
+\texttt{MERGE\_SRC\_M\_TILE} & Base address of tile $m$ array \\
+\texttt{MERGE\_SRC\_L\_TILE} & Base address of tile $l$ array \\
+\texttt{MERGE\_SRC\_O\_TILE} & Base address of tile $O$ matrix \\
+\texttt{MERGE\_DST\_M} & Base address of output $m$ array \\
+\texttt{MERGE\_DST\_L} & Base address of output $l$ array \\
+\texttt{MERGE\_DST\_O} & Base address of output $O$ matrix \\
+\texttt{MERGE\_N} & Number of rows \\
+\texttt{MERGE\_D} & Vector dimension per row \\
+\texttt{MERGE\_STRIDE} & Row stride in bytes; zero means packed \\
+\texttt{MERGE\_CTRL} & \texttt{start} and \texttt{clear\_done} pulses \\
+\texttt{MERGE\_STATUS} & \texttt{busy}, \texttt{done}, and \texttt{error} bits \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The software wrapper writes source and destination offsets, dimensions, and
+stride, then pulses \texttt{start}. Completion is detected by polling
+\texttt{MERGE\_STATUS}. Invalid dimensions, misaligned addresses, and
+unsupported mixed-scalar cases set \texttt{error}.
+
+\subsection{Engine Microarchitecture}
+
+The engine is a streaming state machine. On \texttt{start}, it validates the
+configuration, reads scalar state for one row, computes restricted scalar
+merge results, stores scalar outputs, streams the $D$ vector elements, and then
+advances to the next row. The conceptual states are:
+\texttt{IDLE}, \texttt{LOAD\_SCALAR}, \texttt{COMPUTE\_SCALAR},
+\texttt{STORE\_SCALAR}, \texttt{UPDATE\_VECTOR}, \texttt{DONE}, and
+\texttt{ERROR}, as summarized in Figure~\ref{fig:engine-flow}.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{../data_process/attnres/pic/online_softmax_merge_engine_flow.png}
+\caption{Streaming merge-update engine control flow.}
+\label{fig:engine-flow}
+\end{figure}
+
+The current datapath intentionally uses simple special-case floating-point
+operations instead of a complete exponential and division pipeline. This keeps
+the prototype focused on integration, memory scheduling, and offload overhead.
+
+\subsection{Cluster Integration}
+
+The engine is instantiated in \texttt{spatz\_cluster.sv}. A new TCDM request
+and response channel is added to the narrow TCDM interconnect alongside core
+and AXI-to-TCDM traffic. The request metadata marks engine traffic as non-core
+traffic, allowing the existing performance counter path to include the new
+port. The source file is added to the build manifest so Verilator builds the
+engine as part of the cluster. Figure~\ref{fig:cluster-integration} shows the
+integration point.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{../data_process/attnres/pic/online_softmax_merge_cluster_integration.png}
+\caption{Cluster-local integration of the merge engine.}
+\label{fig:cluster-integration}
+\end{figure}
+
+\subsection{Supported and Unsupported Semantics}
+
+Table \ref{tab:semantics} records the tested input classes. The distinction is
+important because the prototype is a merge-update offload experiment, not a
+complete online softmax implementation.
+
+\begin{table}[t]
+\centering
+\caption{Supported and unsupported input semantics.}
+\label{tab:semantics}
+\begin{tabular}{lll}
+\toprule
+Class & Condition & Behavior \\
+\midrule
+Case 0 & \texttt{l\_tile=0} & Select old state \\
+Case 1 & \texttt{l\_old=0} & Select tile state \\
+Case 2 & Equal $m$ and equal $l$ & Equal-weight merge \\
+Case 3/4 & Equal $m$ and small equal $l$ & Equal-weight merge \\
+Invalid & Zero size or misaligned config & Error \\
+Unsupported & General mixed scalar state & Error \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Implementation}
+
+The implementation touches both hardware and software and is documented in the
+local experiment notes~\cite{spatz-local-docs}. The main RTL module is
+\texttt{hw/ip/online\_merge/src/online\_merge\_update\_engine.sv}. The cluster
+top-level integration is in \texttt{hw/system/spatz\_cluster/src/spatz\_cluster.sv}.
+The peripheral register description adds the \texttt{MERGE\_*} registers and
+regenerates the SystemVerilog and C headers. The runtime-visible definitions
+are exposed through \texttt{sw/snRuntime/include/spatz\_cluster\_peripheral.h}.
+
+The benchmark is \texttt{sw/spatzBenchmarks/online-softmax-merge/main.c}. It
+allocates TCDM buffers, initializes supported cases, computes a CPU reference,
+starts the engine, checks outputs, records cycle counts, and reports TCDM
+accessed and congested counters. It also runs invalid-configuration tests and
+unsupported mixed-scalar probes.
+
+\section{Evaluation}
+
+\subsection{Experimental Setup}
+
+All results in this paper use the Verilator target from the Spatz cluster build
+flow. The software was rebuilt with:
+
+\begin{verbatim}
+make -C hw/system/spatz_cluster sw.vlt
+\end{verbatim}
+
+The benchmark was executed three times with:
+
+\begin{verbatim}
+ctest -R online-softmax-merge -V
+\end{verbatim}
+
+The three runs passed and produced identical cycle and TCDM counter values for
+all valid cases. The CTest wall times were 229.02 s, 232.16 s, and 219.20 s,
+but wall time is not used as an architectural performance metric.
+
+\subsection{Correctness and Error Handling}
+
+For all supported cases, the engine output matches the CPU reference within
+the benchmark tolerance. The benchmark also checks error paths:
+\texttt{N=0}, \texttt{D=0}, misaligned address, misaligned stride, mixed $m$,
+unequal $l$, and a full-reference mixed-scalar probe. Unsupported legal
+mixed-scalar inputs report \texttt{MERGE\_STATUS.error}; this is expected for
+the restricted prototype.
+
+\subsection{Cycle Results}
+
+Figure \ref{fig:cycles} compares CPU scalar cycles and engine cycles. Tiny
+inputs are slower on the engine because the fixed setup and polling overheads
+dominate. As the vector work grows, the engine amortizes the setup cost.
+Table~\ref{tab:perf} lists representative points from the same run.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{../data_process/attnres/pic/online_softmax_merge_bypass_cycles.png}
+\caption{CPU scalar path versus merge engine path cycles.}
+\label{fig:cycles}
+\end{figure}
+
+\begin{table}[t]
+\centering
+\caption{Selected performance points.}
+\label{tab:perf}
+\begin{tabular}{rrrrr}
+\toprule
+$N$ & $D$ & Case & CPU & Engine \\
+\midrule
+1 & 1 & 0 & 191 & 1216 \\
+4 & 8 & 1 & 915 & 1486 \\
+8 & 8 & 2 & 1704 & 1789 \\
+8 & 12 & 2 & 2433 & 2011 \\
+8 & 16 & 2 & 3114 & 2254 \\
+8 & 32 & 2 & 5910 & 3284 \\
+16 & 64 & 2 & 23033 & 9607 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Speedup and Break-Even}
+
+Figure \ref{fig:speedup} reports speedup as CPU cycles divided by engine
+cycles. The largest tested point, $N=16,D=64$, reaches 2.40$\times$ speedup.
+The corresponding cycle reduction is:
+
+\begin{equation}
+\frac{23033 - 9607}{23033} = 58.3\%.
+\end{equation}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{../data_process/attnres/pic/online_softmax_merge_bypass_speedup.png}
+\caption{Speedup of the merge engine path over the CPU scalar path.}
+\label{fig:speedup}
+\end{figure}
+
+The finer equal-weight sweep in Figure \ref{fig:breakeven} shows the
+break-even region. $N=4,D=16$ and $N=8,D=8$ are still slightly below 1.0$\times$,
+while $N=8,D=12$ reaches 1.21$\times$. The break-even point for this restricted
+case is therefore between roughly 64 and 96 vector elements.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{../data_process/attnres/pic/online_softmax_merge_bypass_break_even.png}
+\caption{Break-even sweep for restricted equal-weight case 2.}
+\label{fig:breakeven}
+\end{figure}
+
+\subsection{TCDM Counters}
+
+Figure \ref{fig:tcdm} shows the TCDM counters measured during engine execution.
+The accessed counter scales with workload size, confirming that the engine
+uses its own TCDM master path. Congestion is nonzero but much smaller than the
+access count in this single-engine microbenchmark.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{../data_process/attnres/pic/online_softmax_merge_bypass_tcdm.png}
+\caption{TCDM accessed and congested counters for the engine path.}
+\label{fig:tcdm}
+\end{figure}
+
+\section{Limitations}
+
+The main limitation is semantic: the RTL does not implement the full online
+softmax equation. It lacks a general exponential datapath, weighted
+multiplication for arbitrary scalar summaries, and division or reciprocal
+normalization. Consequently, the reported speedups apply only to the supported
+restricted cases.
+
+The second limitation is workload scope. The evaluation is a microbenchmark
+that isolates merge-update behavior. It does not prove end-to-end attention or
+LLM inference speedup. AttnRes software-side traffic experiments are useful
+motivation for state reuse, but they are not direct hardware performance
+measurements for this engine.
+
+\section{Related Work}
+
+\textbf{Online softmax.}
+Milakov and Gimelshein introduced online normalizer calculation for softmax,
+showing that the normalizer can be maintained while reducing memory
+accesses~\cite{online-softmax2018}. This paper uses the same broad motivation:
+softmax state can be updated in a streaming fashion, and reducing unnecessary
+memory traffic is valuable. Our prototype does not yet implement their full
+generality; it isolates a restricted merge-update subset to study cluster-local
+offload overheads.
+
+\textbf{IO-aware attention.}
+FlashAttention makes exact attention IO-aware by tiling the computation and
+reducing traffic between GPU HBM and on-chip SRAM~\cite{flashattention2022}.
+Our work is much narrower and targets a different platform. Rather than
+restructuring a complete GPU attention kernel, it evaluates whether the
+state-update part of an online-softmax-like flow is worth offloading near
+cluster-local TCDM.
+
+\textbf{Compact cluster processors.}
+Snitch explores a tiny scalar core paired with floating-point execution and
+minimal ISA extensions to improve energy efficiency for floating-point
+workloads~\cite{snitch2020}. Spatz builds compact RISC-V vector units around
+this style of cluster system~\cite{spatz2023}. The merge-update engine in this
+paper follows a different integration point: it avoids ISA changes and uses a
+memory-mapped, cluster-local TCDM master instead of extending the core or vector
+pipeline.
+
+\section{Conclusion}
+
+This paper presented a cluster-local streaming merge-update offload prototype
+for Spatz. The prototype demonstrates that a small MMIO-controlled TCDM master
+engine can outperform scalar software for sufficiently large restricted
+online-softmax state-update workloads, reaching 2.40$\times$ speedup and a
+58.3\% cycle reduction at $N=16,D=64$. The break-even sweep shows that fixed
+offload overheads are amortized between roughly 64 and 96 vector elements for
+the equal-weight case. These results justify a next-stage design with a
+complete online softmax datapath, while the current paper remains scoped to the
+validated restricted prototype.
+
+\bibliographystyle{IEEEtran}
+\bibliography{common/bib/refs}
+
+\end{document}

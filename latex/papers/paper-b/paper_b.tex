@@ -1,0 +1,85 @@
+\documentclass[conference]{IEEEtran}
+
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{url}
+
+\title{Hardware-Assisted Online Softmax Merge for Attention State Reuse on Spatz}
+
+\author{
+  \IEEEauthorblockN{Wenxuan Tang}
+  \IEEEauthorblockA{Local Spatz Prototype Study}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This is the planned paper B skeleton. Unlike paper A, this manuscript is
+reserved for a complete online softmax merge datapath and attention-like
+evaluation. It should only claim complete mixed-scalar support after the RTL
+datapath implements exponential scaling, weighted accumulation, and
+normalization, and after the benchmark turns the current full-reference probe
+from an expected-error case into an output comparison.
+\end{abstract}
+
+\section{Introduction}
+
+Paper B extends the cluster-local merge-update platform from paper A toward a
+complete online softmax merge engine for attention state reuse. The central
+claim should be end-to-end or attention-like value, not only isolated
+restricted-semantics microbenchmark speedup.
+
+\section{Background}
+
+This section should cover online softmax, attention tiling, state reuse, and
+the Spatz/Snitch execution substrate~\cite{online-softmax2018,flashattention2022,spatz2023,snitch2020}.
+
+\section{Architecture}
+
+Describe the complete datapath:
+
+\begin{align}
+m_{new} &= \max(m_{old}, m_{tile}), \\
+l_{new} &= l_{old}e^{m_{old}-m_{new}} +
+           l_{tile}e^{m_{tile}-m_{new}}, \\
+O_{new} &= O_{old}
+          \frac{l_{old}e^{m_{old}-m_{new}}}{l_{new}} +
+          O_{tile}
+          \frac{l_{tile}e^{m_{tile}-m_{new}}}{l_{new}}.
+\end{align}
+
+This section should explicitly discuss `exp`, scaling, reciprocal/division,
+pipeline latency, and TCDM scheduling.
+
+\section{Numeric Design}
+
+Reserve this section for approximation choices, LUT sweeps, reciprocal
+implementation, and error metrics.
+
+\section{Evaluation}
+
+Required evidence before this paper is ready:
+
+\begin{itemize}
+  \item Full mixed-scalar correctness against CPU reference.
+  \item CPU versus engine microbenchmark with the complete datapath.
+  \item Attention-like or AttnRes workload results.
+  \item Error statistics and resource/cost data.
+\end{itemize}
+
+\section{Limitations}
+
+Keep this section honest about unsupported precision modes, workload coverage,
+and resource data quality.
+
+\section{Conclusion}
+
+Summarize the complete datapath result only after the required evidence exists.
+
+\bibliographystyle{IEEEtran}
+\bibliography{common/bib/refs}
+
+\end{document}
